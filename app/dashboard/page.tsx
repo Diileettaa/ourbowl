@@ -105,28 +105,43 @@ export default async function Dashboard() {
 
           {entries && entries.length > 0 ? (
             entries.map((entry) => (
-              <div key={entry.id} className="bg-white p-6 rounded-[24px] shadow-sm border border-gray-100 flex flex-col gap-4 hover:shadow-md transition-all">
-                 {/* 头部信息 */}
-                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${
-                        entry.mood === 'joy' ? 'bg-yellow-400' : 'bg-green-400'
-                      }`}></div>
-                      <span className="text-xs font-bold text-gray-500 uppercase">{entry.mood}</span>
-                    </div>
-                    <span className="text-xs text-gray-300 font-mono">
-                      {new Date(entry.created_at).toLocaleDateString()}
-                    </span>
-                 </div>
+              // 找到列表渲染部分，替换卡片内部代码：
 
-                 {/* 内容 */}
-                 <p className="text-gray-700">{entry.content}</p>
-                 
-                 {/* 图片展示 */}
-                 {entry.image_url && (
-                   <img src={entry.image_url} className="rounded-xl w-full h-48 object-cover border border-gray-100" />
-                 )}
-              </div>
+<div key={entry.id} className="bg-white p-5 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col gap-3 hover:shadow-md transition-all">
+   
+   {/* 顶部：时间 + 餐点类型 */}
+   <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        {/* 如果有 meal_type，显示一个很酷的标签 */}
+        {entry.meal_type && (
+          <span className="px-3 py-1 bg-black text-white text-[10px] font-bold uppercase tracking-wider rounded-full">
+            {entry.meal_type}
+          </span>
+        )}
+        <span className="text-xs text-gray-300 font-mono">
+          {new Date(entry.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+        </span>
+      </div>
+      
+      {/* 心情 */}
+      <div className="flex items-center gap-1 px-2 py-1 bg-yellow-50 rounded-lg text-xs font-medium text-yellow-700">
+         {/* 这里简单处理，最好能映射回 emoji */}
+         {entry.mood}
+      </div>
+   </div>
+
+   {/* 图片 */}
+   {entry.image_url && (
+     <div className="rounded-2xl overflow-hidden aspect-video relative">
+        <img src={entry.image_url} className="absolute inset-0 w-full h-full object-cover" />
+     </div>
+   )}
+
+   {/* 内容 */}
+   <p className="text-gray-800 font-medium leading-relaxed whitespace-pre-wrap">
+     {entry.content}
+   </p>
+</div>
             ))
           ) : (
             <div className="text-center py-20 opacity-30">
