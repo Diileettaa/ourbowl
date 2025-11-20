@@ -9,7 +9,7 @@ import PetMochi from '@/components/PetMochi'
 import { X } from 'lucide-react'
 
 const moodEmojiMap: Record<string, string> = {
-  'Joy': '🥰', 'Calm': '🌿', 'Neutral': '😶', 'Tired': '😴', 'Stressed': '🤯',
+  'Joy': '🥰', 'Calm': '🙂', 'Neutral': '😶', 'Tired': '😴', 'Stressed': '🤯',
   'Angry': '🤬', 'Crying': '😭', 'Excited': '🎉', 'Sick': '🤢', 'Proud': '😎', 'Love': '❤️'
 }
 
