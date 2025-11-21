@@ -1,115 +1,141 @@
-import { createClient } from '@/utils/supabase/server'
-import { redirect } from 'next/navigation'
-import Link from 'next/link'
-import { ArrowLeft, Calendar, Clock } from 'lucide-react'
+'use client'
 
-// 情绪颜色映射 (更高级的莫兰迪色)
-const moodColorMap: Record<string, string> = {
-  'Joy': 'bg-yellow-400', 
-  'Calm': 'bg-emerald-400', 
-  'Neutral': 'bg-gray-300', 
-  'Tired': 'bg-indigo-300', 
-  'Stressed': 'bg-rose-400',
-  'Angry': 'bg-red-500',
-  'Crying': 'bg-blue-400',
-  'Excited': 'bg-pink-400',
-  'Sick': 'bg-green-600',
-  'Proud': 'bg-orange-400',
-  'Love': 'bg-red-400'
+import { useState, useEffect } from 'react'
+import { supabase } from '@/utils/supabase/client'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { ArrowLeft, X, Maximize2 } from 'lucide-react'
+
+// 复用 Dashboard 的表情映射
+const moodEmojiMap: Record<string, string> = {
+  'Joy': '🥰', 'Calm': '🌿', 'Neutral': '😶', 'Tired': '😴', 'Stressed': '🤯',
+  'Angry': '🤬', 'Crying': '😭', 'Excited': '🎉', 'Sick': '🤢', 'Proud': '😎', 'Love': '❤️'
 }
 
-export default async function JourneyPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/')
+export default function JourneyPage() {
+  const [entries, setEntries] = useState<any[]>([])
+  const [selectedImage, setSelectedImage] = useState<string | null>(null) // 控制图片放大
+  const router = useRouter()
 
-  // 获取所有数据
-  const { data: entries } = await supabase
-    .from('entries')
-    .select('*')
-    .order('created_at', { ascending: false })
+  useEffect(() => {
+    const getData = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/'); return }
+
+      const { data } = await supabase
+        .from('entries')
+        .select('*')
+        .order('created_at', { ascending: false })
+      
+      setEntries(data || [])
+    }
+    getData()
+  }, [])
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] p-6 md:p-12">
-      <div className="max-w-3xl mx-auto">
+    <div className="min-h-screen bg-[#FAFAFA] p-4 md:p-8">
+      
+      {/* --- 图片全屏查看器 (Lightbox) --- */}
+      {selectedImage && (
+        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setSelectedImage(null)}>
+          <button className="absolute top-6 right-6 text-white/70 hover:text-white"><X size={32}/></button>
+          <img src={selectedImage} className="max-w-full max-h-[90vh] rounded-lg shadow-2xl object-contain" />
+        </div>
+      )}
+
+      <div className="max-w-2xl mx-auto">
         
         {/* 顶部导航 */}
-        <div className="flex items-center justify-between mb-12">
-          <div className="flex items-center gap-4">
-            <Link href="/dashboard" className="p-3 bg-white border border-gray-200 rounded-full hover:bg-gray-50 transition-colors shadow-sm">
-              <ArrowLeft size={20} className="text-gray-600" />
-            </Link>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Your Journey</h1>
-              <p className="text-gray-500 text-sm mt-1">{entries?.length || 0} memories collected</p>
-            </div>
+        <div className="flex items-center gap-4 mb-8">
+          <Link href="/dashboard" className="p-2 bg-white border border-gray-200 rounded-full hover:bg-gray-50 transition-colors shadow-sm">
+            <ArrowLeft size={20} className="text-gray-600" />
+          </Link>
+          <div>
+            <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Your Journey</h1>
+            <p className="text-xs text-gray-400 font-mono">{entries.length} memories</p>
           </div>
         </div>
 
-        {/* ⏳ 核心：时间轴列表 */}
-        <div className="relative border-l-2 border-gray-100 ml-4 md:ml-8 space-y-12 pb-20">
+        {/* ⏳ 核心：紧凑时间轴列表 */}
+        {/* 左侧的竖线 */}
+        <div className="relative border-l-2 border-gray-200/60 ml-4 space-y-6 pb-20">
           
-          {entries?.map((entry) => {
-            const date = new Date(entry.created_at)
-            const moodColor = moodColorMap[entry.mood] || 'bg-gray-300'
-            
+          {entries.map((entry) => {
+            const lines = entry.content?.split('\n') || []
+            // 智能判断：如果第一行很短(小于20字)，当做标题；否则全文当做内容
+            const isTitle = lines[0]?.length < 20
+            const title = isTitle ? lines[0] : null
+            const content = isTitle ? lines.slice(1).join(' ') : entry.content
+
+            const moodEmoji = moodEmojiMap[entry.mood] || null
+
             return (
-              <div key={entry.id} className="relative pl-8 md:pl-12 group">
+              <div key={entry.id} className="relative pl-8 group">
                 
-                {/* 1. 时间轴上的点 (Dot) */}
-                <div className={`absolute -left-[9px] top-0 w-4 h-4 rounded-full border-2 border-white shadow-sm ${moodColor} group-hover:scale-125 transition-transform`}></div>
+                {/* 1. 时间轴节点 (Dot) */}
+                {/* 放在左侧线条上，根据是否有图变色 */}
+                <div className={`absolute -left-[7px] top-6 w-3.5 h-3.5 rounded-full border-2 border-white shadow-sm z-10 transition-colors ${
+                   entry.mood === 'Joy' ? 'bg-yellow-400' : 'bg-gray-300'
+                }`}></div>
 
-                {/* 2. 内容卡片 (Card) */}
-                <div className="flex flex-col gap-1">
+                {/* 2. 卡片本体 (更方、更紧凑、左文右图) */}
+                <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-[0_2px_4px_rgba(0,0,0,0.02)] hover:shadow-md transition-all flex justify-between gap-4">
                   
-                  {/* 日期头 */}
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
-                      <Calendar size={12} />
-                      {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </span>
-                    <span className="text-xs text-gray-300 font-mono flex items-center gap-1">
-                      <Clock size={12} />
-                      {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                    {/* 心情标签 */}
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${moodColor} bg-opacity-20 text-gray-600`}>
-                      {entry.mood}
-                    </span>
-                  </div>
-
-                  {/* 主内容卡片 */}
-                  <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-md transition-all">
+                  {/* === 左侧：文字信息区 === */}
+                  <div className="flex-1 flex flex-col min-w-0">
                     
-                    {/* 图片 */}
-                    {entry.image_url && (
-                      <div className="mb-4 rounded-lg overflow-hidden border border-gray-100">
-                        <img src={entry.image_url} className="w-full max-h-96 object-cover" />
-                      </div>
-                    )}
-
-                    {/* 文字 */}
-                    <div className="prose prose-sm max-w-none text-gray-700 leading-relaxed whitespace-pre-wrap font-medium">
-                      {entry.content}
+                    {/* 顶部：心情 + 标签 (极简的一行) */}
+                    <div className="flex items-center gap-2 mb-2">
+                       {/* 心情 (优先 Emoji) */}
+                       <div className="text-lg" title={entry.mood}>
+                          {moodEmoji || <span className="text-[10px] bg-gray-100 px-1.5 py-0.5 rounded text-gray-500">{entry.mood}</span>}
+                       </div>
+                       
+                       {/* 餐点标签 (如果有) */}
+                       {entry.meal_type && entry.meal_type !== 'Life' && (
+                         <span className="text-[10px] font-bold uppercase text-gray-400 bg-gray-50 px-2 py-0.5 rounded border border-gray-100">
+                           {entry.meal_type}
+                         </span>
+                       )}
                     </div>
 
-                    {/* 底部标签 */}
-                    {entry.meal_type && entry.meal_type !== 'Life' && (
-                      <div className="mt-4 pt-4 border-t border-gray-50 flex gap-2">
-                        <span className="text-xs font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded">
-                          {entry.meal_type}
-                        </span>
-                      </div>
-                    )}
+                    {/* 标题 (如果有) */}
+                    {title && <h3 className="font-bold text-gray-800 text-base mb-1 leading-tight">{title}</h3>}
+                    
+                    {/* 正文 (允许换行，但字号适中) */}
+                    <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap mb-3">
+                      {content}
+                    </p>
+
+                    {/* 底部：极简日期 (压扁) */}
+                    <div className="mt-auto pt-2 border-t border-gray-50 flex items-center gap-2 text-[10px] text-gray-400 font-mono">
+                       <span>{new Date(entry.created_at).toLocaleDateString()}</span>
+                       <span className="w-1 h-1 rounded-full bg-gray-300"></span>
+                       <span>{new Date(entry.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                    </div>
                   </div>
+
+                  {/* === 右侧：图片区 (固定正方形，可点击) === */}
+                  {entry.image_url && (
+                    <div 
+                      className="w-24 h-24 shrink-0 rounded-lg bg-gray-50 overflow-hidden cursor-zoom-in border border-gray-100 relative group/img"
+                      onClick={() => setSelectedImage(entry.image_url)}
+                    >
+                      <img src={entry.image_url} className="w-full h-full object-cover transition-transform duration-500 group-hover/img:scale-110" />
+                      {/* 放大图标提示 */}
+                      <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover/img:opacity-100">
+                         <Maximize2 size={16} className="text-white drop-shadow-md" />
+                      </div>
+                    </div>
+                  )}
 
                 </div>
               </div>
             )
           })}
 
-          {(!entries || entries.length === 0) && (
-            <div className="pl-8 text-gray-400 italic">Journey begins here...</div>
+          {entries.length === 0 && (
+            <div className="pl-8 text-gray-400 text-sm italic">No journey recorded yet...</div>
           )}
 
         </div>

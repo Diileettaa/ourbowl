@@ -26,7 +26,8 @@ export default function NavBar({ userEmail }: { userEmail?: string }) {
 
   return (
     // ✨ 重点：这里没有任何 bg- 颜色，它是完全透明的，让页面的渐变色透上来
-    <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4 pointer-events-none flex justify-center bg-gradient-to-b from-[#FFFDF6]/90 to-transparent backdrop-blur-sm">
+    <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4 pointer-events-none flex justify-center bg-gradient-to-b from-[#F9FAFB]/90 to-transparent backdrop-blur-sm">
+
 
       <div className="w-full max-w-5xl flex justify-between items-center pointer-events-auto">
         
