@@ -9,7 +9,7 @@ import PetMochi from '@/components/PetMochi'
 import { X } from 'lucide-react'
 
 const moodEmojiMap: Record<string, string> = {
-  'Joy': '🥰', 'Calm': '🌿', 'Neutral': '😶', 'Tired': '😴', 'Stressed': '🤯',
+  'Joy': '🥰', 'Calm': '🙂', 'Neutral': '😶', 'Tired': '😴', 'Stressed': '🤯',
   'Angry': '🤬', 'Crying': '😭', 'Excited': '🎉', 'Sick': '🤢', 'Proud': '😎', 'Love': '❤️'
 }
 
@@ -38,13 +38,12 @@ export default function Dashboard() {
   if (!user) return null
 
   return (
-    // ✨✨✨ 终极高级感渐变 ✨✨✨
-    // 这里的 from-[#FFFCF5] 是非常非常淡的奶油色，几乎接近白，但有温度
-    // 这里的 to-[#F8FAFC] 是冷色调的白
-    // 加上 min-h-screen 确保它铺满全屏，没有任何分割线
-    <div className="min-h-screen bg-gradient-to-b from-[#FFFCF5] to-[#F8FAFC] pb-20 relative">
+    // ✨ 背景重点：从极淡奶黄(#FFFBEB) 渐变到 冷灰白(#F1F5F9)
+    // 这里的 padding-bottom (pb-20) 是为了防止底部内容贴边
+    <div className="min-h-screen bg-gradient-to-b from-[#FFFDF6] via-[#FAFAF9] to-[#F1F5F9] pb-20 relative">
+
       
-      {/* 图片全屏查看器 */}
+      {/* --- 图片全屏查看器 (Lightbox) --- */}
       {selectedImage && (
         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setSelectedImage(null)}>
           <button className="absolute top-6 right-6 text-white/70 hover:text-white"><X size={32}/></button>
@@ -52,39 +51,57 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="max-w-2xl mx-auto px-4 pt-32 relative z-10">
+      {/* 主内容区域：pt-28 是为了给顶部的导航栏留出空间，同时让背景色延伸上去 */}
+      <div className="max-w-2xl mx-auto px-4 pt-28 relative z-10">
         
-        {/* Header: 欢迎语 */}
+        {/* 1. Header: 欢迎语 */}
         <div className="flex justify-between items-center mb-6">
           <div>
             <h1 className="text-3xl font-black text-gray-800 tracking-tight">Hello, Owner</h1>
             <p className="text-sm text-gray-400 font-medium mt-1 font-mono">{user.email}</p>
           </div>
-          <Link href="/exploration" className="w-12 h-12 bg-[#1F2937] text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-all border-4 border-[#FFFCF5]">
+          <Link href="/exploration" className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-all border-2 border-[#FFFBEB]">
             🪐
           </Link>
         </div>
 
-        {/* 🌟 宠物舞台 */}
-        <div className="relative h-56 flex items-end justify-center z-0 pointer-events-none -mb-8">
-            <div className="pointer-events-auto scale-110 origin-bottom"> 
-               {pet ? <PetMochi lastFedAt={pet.last_fed_at} /> : <div className="text-4xl animate-bounce">🥚</div>}
-            </div>
+        {/* 2. 宠物区域 (Pet Card) */}
+        {/* 使用半透明白色背景 (bg-white/60) 让底部的黄色透出来一点点，增加融合感 */}
+        <div className="bg-white/60 backdrop-blur-md p-6 rounded-[32px] shadow-sm border border-white/60 mb-10 relative overflow-visible">
+           <div className="flex justify-between items-center">
+              
+              {/* 左侧信息 */}
+              <div>
+                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Pet Status</div>
+                 <h2 className="text-xl font-bold text-gray-800 mb-1">Mochi is Active</h2>
+                 <p className="text-sm text-gray-400">Level 1 • Baby Phase</p>
+                 
+                 {/* 状态小标签 */}
+                 <div className="flex gap-2 mt-4">
+                    <span className="px-3 py-1 bg-orange-100/50 text-orange-500 text-xs font-bold rounded-full">LV.1 Baby</span>
+                    <span className="px-3 py-1 bg-blue-100/50 text-blue-500 text-xs font-bold rounded-full">✨ Happy</span>
+                 </div>
+              </div>
+
+              {/* 右侧：宠物 (位置稍微突出卡片一点点) */}
+              <div className="w-32 h-24 relative -mr-4 -mt-6">
+                 {pet ? <PetMochi lastFedAt={pet.last_fed_at} /> : <div className="text-2xl">🥚</div>}
+              </div>
+           </div>
         </div>
 
-        {/* 输入框 */}
-        <div className="mb-10 sticky top-6 z-40">
+        {/* 3. 输入框 (MagicBar) */}
+        <div className="mb-12">
            <MagicBar />
         </div>
 
-        {/* 列表标题 */}
-        <div className="flex items-center justify-between mb-4 px-2 mt-8">
-          <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider">Memory Lane</h3>
-          <span className="text-[10px] font-bold text-gray-400 bg-white px-3 py-1 rounded-full shadow-sm border border-gray-100">Today</span>
-        </div>
-
-        {/* 列表内容 */}
+        {/* 4. 列表内容 (History) */}
         <div className="space-y-4">
+          <div className="flex items-center gap-2 mb-4 opacity-50 px-2">
+             <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">History</span>
+             <div className="h-px bg-gray-300 flex-1"></div>
+          </div>
+
           {entries.map((entry) => {
              const lines = entry.content?.split('\n') || []
              const title = lines[0] || 'Moment'
@@ -92,8 +109,9 @@ export default function Dashboard() {
              const moodEmoji = moodEmojiMap[entry.mood] || null
 
              return (
-              <div key={entry.id} className="bg-white p-5 rounded-[28px] shadow-sm border border-white/50 hover:shadow-md transition-all flex justify-between gap-4 group">
+              <div key={entry.id} className="bg-white p-5 rounded-[24px] shadow-sm border border-white hover:shadow-md transition-all flex justify-between gap-4 group">
                 
+                {/* 左侧：文字信息 (自适应宽度) */}
                 <div className="flex-1 flex flex-col min-w-0">
                    <div className="flex items-center gap-2 mb-2">
                       <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg uppercase tracking-wide ${
@@ -101,9 +119,7 @@ export default function Dashboard() {
                       }`}>
                         {entry.meal_type || 'Note'}
                       </span>
-                      <div className="text-lg filter grayscale-[0.3] group-hover:grayscale-0 transition-all">
-                        {moodEmoji}
-                      </div>
+                      <div className="text-lg">{moodEmoji}</div>
                    </div>
                    
                    <h4 className="text-gray-800 font-bold text-lg truncate pr-2 mb-1">{title}</h4>
@@ -119,6 +135,7 @@ export default function Dashboard() {
                    </div>
                 </div>
 
+                {/* 右侧：图片 (如果有图片，显示正方形缩略图) */}
                 {entry.image_url && (
                   <div 
                     className="w-24 h-24 shrink-0 rounded-2xl bg-gray-100 overflow-hidden cursor-zoom-in relative shadow-inner border border-gray-100"
@@ -133,7 +150,7 @@ export default function Dashboard() {
           
           {entries.length === 0 && (
             <div className="text-center py-12 text-gray-300 text-sm">
-              Waiting for your first story...
+              No memories yet. Start recording!
             </div>
           )}
         </div>
