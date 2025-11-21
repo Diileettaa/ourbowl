@@ -16,12 +16,17 @@ type Entry = {
   meal_type?: string
 }
 
+// ✨ 新增了 Food, Other 和更多情绪的颜色
 const COLORS: Record<string, string> = {
   'Joy': '#FFD700', 'Calm': '#00FFCC', 'Neutral': '#FFFFFF', 'Tired': '#8A2BE2',
-  'Stressed': '#FF4500', 'Angry': '#FF0000', 'Crying': '#00BFFF', 'Excited': '#FF1493',
-  'Sick': '#32CD32', 'Proud': '#FF8C00', 'Love': '#FF69B4'
+  'Stressed': '#FF4500', 
+  'Angry': '#FF0000', 'Crying': '#00BFFF', 'Excited': '#FF1493',
+  'Sick': '#32CD32', 'Proud': '#FF8C00', 'Love': '#FF69B4',
+  'Food': '#FFA500',  // 美食是橙色
+  'Other': '#A0A0A0'  // 其他是灰色
 }
 
+// --- 1. 连线组件 ---
 function Connections({ positions, color }: { positions: THREE.Vector3[], color: string }) {
   const lines = useMemo(() => {
     const points: THREE.Vector3[] = []
@@ -35,50 +40,35 @@ function Connections({ positions, color }: { positions: THREE.Vector3[], color: 
   }, [positions])
 
   return (
-    <Line
-      points={lines}
-      color={color}
-      opacity={0.05}
-      transparent
-      lineWidth={0.5}
-      segments
-    />
+    <Line points={lines} color={color} opacity={0.05} transparent lineWidth={0.5} segments />
   )
 }
 
+// --- 2. 星球组件 ---
 function GravityPlanet({ 
-  entry, 
-  originalPos, 
-  isSelected, 
-  isAnySelected, 
-  onClick 
+  entry, originalPos, isSelected, isAnySelected, onClick 
 }: { 
-  entry: Entry; 
-  originalPos: [number, number, number]; 
-  isSelected: boolean; 
-  isAnySelected: boolean;
-  onClick: (e: Entry) => void 
+  entry: Entry; originalPos: [number, number, number]; isSelected: boolean; isAnySelected: boolean; onClick: (e: Entry) => void 
 }) {
   const meshRef = useRef<THREE.Mesh>(null)
   const [hovered, setHover] = useState(false)
-  const baseColor = COLORS[entry.mood] || '#FFFFFF'
+  // 如果找不到对应颜色，就默认为 Other 的颜色
+  const baseColor = COLORS[entry.mood] || COLORS['Other']
   
   const randomSpeed = useMemo(() => 0.5 + Math.random() * 1.5, [])
   const randomOffset = useMemo(() => Math.random() * 100, [])
 
   useFrame((state) => {
     if (!meshRef.current) return
-    
     let targetPos = new THREE.Vector3(...originalPos)
     let targetScale = 1.0
 
     if (isAnySelected) {
       if (isSelected) {
-        // 选中时飞到侧上方，把中间位置留给大弹窗
-        targetPos.set(0, 3, 8) 
+        targetPos.set(0, 1.5, 8)
         targetScale = 1.4
       } else {
-        targetPos.multiplyScalar(0.4) 
+        targetPos.multiplyScalar(0.4)
         targetScale = 0.4
       }
     } else {
@@ -101,75 +91,58 @@ function GravityPlanet({
   }
 
   return (
-    <group>
-      <mesh 
-        ref={meshRef}
-        onClick={(e) => { e.stopPropagation(); onClick(entry) }}
-        onPointerOver={() => { if(!isAnySelected) { document.body.style.cursor = 'pointer'; setHover(true) } }}
-        onPointerOut={() => { document.body.style.cursor = 'auto'; setHover(false) }}
-      >
-        <sphereGeometry args={[0.5, 32, 32]} /> 
-        <meshPhysicalMaterial 
-          color={baseColor}
-          emissive={baseColor}
-          emissiveIntensity={getEmissiveIntensity()}
-          roughness={0.2}
-          metalness={0.1}
-          transmission={0.5}
-          thickness={1.5}
-          transparent
-          opacity={isAnySelected && !isSelected ? 0.3 : 0.9}
-        />
-      </mesh>
-    </group>
+    <mesh 
+      ref={meshRef}
+      onClick={(e) => { e.stopPropagation(); onClick(entry) }}
+      onPointerOver={() => { if(!isAnySelected) { document.body.style.cursor = 'pointer'; setHover(true) } }}
+      onPointerOut={() => { document.body.style.cursor = 'auto'; setHover(false) }}
+    >
+      <sphereGeometry args={[0.5, 32, 32]} /> 
+      <meshPhysicalMaterial 
+        color={baseColor}
+        emissive={baseColor}
+        emissiveIntensity={getEmissiveIntensity()}
+        roughness={0.2}
+        metalness={0.1}
+        transmission={0.5}
+        thickness={1.5}
+        transparent
+        opacity={isAnySelected && !isSelected ? 0.3 : 0.9}
+      />
+    </mesh>
   )
 }
 
-// --- ✨ 3. 重点修改：博物馆级大弹窗 ---
+// --- 3. 详情弹窗 ---
 function DetailModal({ entry, onClose }: { entry: Entry; onClose: () => void }) {
-  const color = COLORS[entry.mood] || '#FFFFFF'
+  const color = COLORS[entry.mood] || COLORS['Other']
   
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none p-4 md:p-12">
-      {/* 卡片本体：根据是否有图来决定宽度 */}
       <div 
         className={`pointer-events-auto bg-black/80 backdrop-blur-2xl border border-white/10 rounded-[32px] shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-500 flex flex-col md:flex-row ${entry.image_url ? 'max-w-4xl w-full h-[60vh] md:h-[500px]' : 'max-w-md w-full'}`}
-        style={{ 
-          boxShadow: `0 0 80px ${color}20`,
-          borderTop: `1px solid ${color}60` 
-        }}
+        style={{ boxShadow: `0 0 80px ${color}20`, borderTop: `1px solid ${color}60` }}
       >
         <button onClick={onClose} className="absolute top-4 right-4 text-white/50 hover:text-white p-2 bg-white/5 rounded-full transition-colors z-50">
           <X size={20} />
         </button>
 
-        {/* --- 左侧：照片区 (如果有照片) --- */}
         {entry.image_url && (
           <div className="relative w-full md:w-3/5 h-1/2 md:h-full bg-black/50 flex items-center justify-center p-4 border-b md:border-b-0 md:border-r border-white/10">
-             {/* object-contain: 保证照片完整显示，绝不裁剪 */}
-             <img 
-               src={entry.image_url} 
-               className="max-w-full max-h-full object-contain rounded-lg shadow-lg" 
-               alt="Memory"
-             />
+             <img src={entry.image_url} className="max-w-full max-h-full object-contain rounded-lg shadow-lg" alt="Memory" />
           </div>
         )}
 
-        {/* --- 右侧：文字信息区 --- */}
         <div className={`flex-1 flex flex-col p-6 md:p-8 ${entry.image_url ? 'h-1/2 md:h-full' : ''} overflow-y-auto`}>
-          
-          {/* 头部 Mood */}
           <div className="flex items-center gap-4 mb-6 shrink-0">
              <div className="w-14 h-14 rounded-full flex items-center justify-center text-3xl bg-white/5 shadow-inner border border-white/10">
                 {entry.mood === 'Joy' ? '🥰' : '✨'}
              </div>
              <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-white font-black text-2xl tracking-wide">{entry.mood}</span>
+                  <span className="text-white font-black text-2xl tracking-wide">{entry.mood || 'Memory'}</span>
                   {entry.meal_type && (
-                    <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded-md text-white/60 uppercase tracking-wider">
-                      {entry.meal_type}
-                    </span>
+                    <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded-md text-white/60 uppercase tracking-wider">{entry.meal_type}</span>
                   )}
                 </div>
                 <div className="flex items-center gap-3 text-xs text-white/40 font-mono">
@@ -178,38 +151,27 @@ function DetailModal({ entry, onClose }: { entry: Entry; onClose: () => void }) 
                 </div>
              </div>
           </div>
-
-          {/* 装饰线 */}
           <div className="w-full h-px bg-gradient-to-r from-white/20 to-transparent mb-6 shrink-0"></div>
-
-          {/* 文字内容 */}
           <div className="relative pl-4 border-l-2 flex-1 overflow-y-auto pr-2" style={{ borderColor: `${color}60` }}>
-             <p className="text-white/90 leading-loose font-medium text-lg whitespace-pre-wrap">
-               {entry.content}
-             </p>
+             <p className="text-white/90 leading-loose font-medium text-lg whitespace-pre-wrap">{entry.content}</p>
           </div>
-
         </div>
-
       </div>
     </div>
   )
 }
 
+// --- 4. 主组件 ---
 export default function EmotionGalaxy({ entries, filter }: { entries: Entry[], filter: string | null }) {
   const [selectedEntry, setSelectedEntry] = useState<Entry | null>(null)
 
-  const filteredEntries = useMemo(() => {
-    if (!filter) return entries
-    return entries.filter(e => e.mood === filter)
-  }, [entries, filter])
-
+  // 注意：这里的 entries 已经是父组件筛选过的数据了，直接用
   const positions = useMemo(() => {
-    const count = filteredEntries.length
+    const count = entries.length
     const phi = Math.PI * (3 - Math.sqrt(5))
     const r = 10 
 
-    return filteredEntries.map((_, i) => {
+    return entries.map((_, i) => {
       const y = 1 - (i / (count - 1)) * 2
       const radius = Math.sqrt(1 - y * y)
       const theta = phi * i
@@ -219,38 +181,33 @@ export default function EmotionGalaxy({ entries, filter }: { entries: Entry[], f
         Math.sin(theta) * radius * r
       )
     })
-  }, [filteredEntries])
+  }, [entries])
 
   const posArray = useMemo(() => positions.map(p => [p.x, p.y, p.z] as [number, number, number]), [positions])
-  const universeColor = filter ? (COLORS[filter] || 'white') : 'white'
+  // 处理 "Food" 和 "Other" 的特殊颜色
+  const universeColor = filter ? (COLORS[filter] || COLORS['Other']) : 'white'
 
   return (
     <div className="w-full h-full bg-black relative">
-      
       {selectedEntry && <DetailModal entry={selectedEntry} onClose={() => setSelectedEntry(null)} />}
-
       <Canvas camera={{ position: [0, 0, 24], fov: 45 }} dpr={[1, 2]}>
         <color attach="background" args={['#050508']} />
         <fog attach="fog" args={['#050508', 20, 60]} />
-
+        
         {/* @ts-ignore */}
         <EffectComposer disableNormalPass>
           <Bloom luminanceThreshold={0.2} mipmapBlur intensity={1.5} radius={0.6} />
         </EffectComposer>
-
+        
         <ambientLight intensity={0.1} />
         <pointLight position={[10, 10, 10]} intensity={1} color={universeColor} />
-
         <Stars radius={100} depth={50} count={6000} factor={4} saturation={0} fade speed={0.5} />
         <Sparkles count={100} scale={12} size={2} speed={0.2} opacity={0.3} color={universeColor} />
-
+        
         <Float speed={1} rotationIntensity={0.1} floatIntensity={0.2}>
           <group>
-             {!selectedEntry && (
-                <Connections positions={positions} color={universeColor} />
-             )}
-
-             {filteredEntries.map((entry, i) => (
+             {!selectedEntry && <Connections positions={positions} color={universeColor} />}
+             {entries.map((entry, i) => (
                 <GravityPlanet 
                   key={entry.id} 
                   entry={entry} 
@@ -262,15 +219,7 @@ export default function EmotionGalaxy({ entries, filter }: { entries: Entry[], f
              ))}
           </group>
         </Float>
-
-        <OrbitControls 
-          enableZoom={!selectedEntry} 
-          enablePan={false} 
-          autoRotate={!selectedEntry} 
-          autoRotateSpeed={0.5}
-          maxDistance={50}
-          minDistance={5}
-        />
+        <OrbitControls enableZoom={!selectedEntry} enablePan={false} autoRotate={!selectedEntry} autoRotateSpeed={0.5} maxDistance={50} minDistance={5} />
       </Canvas>
     </div>
   )
