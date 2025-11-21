@@ -4,167 +4,146 @@ import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '@/utils/supabase/client'
 import { 
   startOfMonth, endOfMonth, eachDayOfInterval, format, 
-  isSameMonth, isSameDay, parseISO, getDay, addMonths, subMonths 
+  isSameMonth, isSameDay, parseISO, startOfWeek, endOfWeek, 
+  getDay, addMonths, subMonths, differenceInDays 
 } from 'date-fns'
-import { Search, ChevronLeft, ChevronRight, Filter, X } from 'lucide-react'
+import { Search, ChevronLeft, ChevronRight, Filter, X, Lock, TrendingUp } from 'lucide-react'
 import { 
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, 
-  PieChart, Pie, Legend 
+  BarChart, Bar, XAxis, Tooltip as RechartsTooltip, ResponsiveContainer, 
+  PieChart, Pie, Cell, Legend
 } from 'recharts'
 
-// 心情配置 & 颜色映射 (用于图表)
+// 情绪配置 (保持一致)
 const MOODS = [
-  { name: 'Joy', emoji: '🥰', color: '#FBBF24' }, // amber-400
-  { name: 'Calm', emoji: '🌿', color: '#34D399' }, // emerald-400
-  { name: 'Neutral', emoji: '😶', color: '#9CA3AF' }, // gray-400
-  { name: 'Tired', emoji: '😴', color: '#818CF8' }, // indigo-400
-  { name: 'Stressed', emoji: '🤯', color: '#F87171' }, // red-400
-  { name: 'Sad', emoji: '😭', color: '#60A5FA' }, // blue-400
-  { name: 'Angry', emoji: '🤬', color: '#EF4444' }, // red-500
-  { name: 'Excited', emoji: '🎉', color: '#F472B6' }, // pink-400
-  { name: 'Sick', emoji: '🤢', color: '#10B981' }, // emerald-500
-  { name: 'Proud', emoji: '😎', color: '#FB923C' }, // orange-400
-  { name: 'Love', emoji: '❤️', color: '#EC4899' }, // pink-500
+  { name: 'Joy', emoji: '🥰', color: '#FBBF24' }, // Amber
+  { name: 'Calm', emoji: '🌿', color: '#34D399' }, // Emerald
+  { name: 'Neutral', emoji: '😶', color: '#9CA3AF' }, // Gray
+  { name: 'Tired', emoji: '😴', color: '#818CF8' }, // Indigo
+  { name: 'Stressed', emoji: '🤯', color: '#F87171' }, // Red
+  { name: 'Sad', emoji: '😭', color: '#60A5FA' }, // Blue
+  { name: 'Angry', emoji: '🤬', color: '#EF4444' }, // Red
+  { name: 'Excited', emoji: '🎉', color: '#F472B6' }, // Pink
+  { name: 'Sick', emoji: '🤢', color: '#10B981' }, // Green
+  { name: 'Proud', emoji: '😎', color: '#FB923C' }, // Orange
+  { name: 'Love', emoji: '❤️', color: '#EC4899' }, // Pink
+  { name: 'Other', emoji: '💭', color: '#D1D5DB' }
 ]
-
-// 辅助函数：根据心情名字找颜色
-const getColor = (moodName: string) => MOODS.find(m => m.name === moodName)?.color || '#E5E7EB'
 
 export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [entries, setEntries] = useState<any[]>([])
-  
-  // 搜索状态
   const [searchText, setSearchText] = useState('')
-  const [filterMood, setFilterMood] = useState<string | null>(null) // 选中的心情
-  const [showFilterMenu, setShowFilterMenu] = useState(false) // 控制筛选菜单显示
+  const [filterMood, setFilterMood] = useState<string | null>(null)
+  const [showFilterMenu, setShowFilterMenu] = useState(false)
+  
+  // 计算用户使用了多少天
+  const [daysActive, setDaysActive] = useState(0)
 
   useEffect(() => {
     const fetchData = async () => {
-      const { data } = await supabase.from('entries').select('*')
-      setEntries(data || [])
+      const { data } = await supabase.from('entries').select('*').order('created_at', { ascending: true })
+      if (data && data.length > 0) {
+        setEntries(data)
+        // 计算活跃天数：今天 - 第一条日记的时间
+        const firstDate = parseISO(data[0].created_at)
+        const diff = differenceInDays(new Date(), firstDate)
+        setDaysActive(diff)
+      }
     }
     fetchData()
   }, [])
 
-  // --- 日历逻辑 ---
+  // --- 日历基础数据 ---
   const monthStart = startOfMonth(currentDate)
   const monthEnd = endOfMonth(currentDate)
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd })
   const startDayOfWeek = monthStart.getDay()
   const emptyDays = Array(startDayOfWeek).fill(null)
 
-  // --- 筛选逻辑 (Core Logic) ---
+  // --- 筛选逻辑 ---
   const checkDateStatus = (day: Date) => {
-    // 1. 找到当天的日记
     const daysEntries = entries.filter(e => isSameDay(parseISO(e.created_at), day))
     if (daysEntries.length === 0) return 'empty'
-
-    // 2. 如果有心情筛选
-    if (filterMood) {
-      const hasMood = daysEntries.some(e => e.mood === filterMood)
-      return hasMood ? 'match' : 'dim'
-    }
-
-    // 3. 如果有文字搜索
+    if (filterMood) return daysEntries.some(e => e.mood === filterMood) ? 'match' : 'dim'
     if (searchText.trim()) {
-      const hasKeyword = daysEntries.some(e => 
-        e.content?.toLowerCase().includes(searchText.toLowerCase()) ||
-        e.meal_type?.toLowerCase().includes(searchText.toLowerCase())
-      )
-      return hasKeyword ? 'match' : 'dim'
+      const lower = searchText.toLowerCase()
+      return daysEntries.some(e => 
+        e.content?.toLowerCase().includes(lower) || e.meal_type?.toLowerCase().includes(lower)
+      ) ? 'match' : 'dim'
     }
-
     return 'has-entry'
   }
 
-  // --- 统计数据计算 (Data Analysis) ---
-  // 只统计“当前选中月份”的数据
-  const monthlyEntries = entries.filter(e => isSameMonth(parseISO(e.created_at), currentDate))
+  // --- 📊 统计逻辑 (核心升级) ---
 
-  // 1. 情绪占比 (Pie Chart Data)
-  const moodStats = useMemo(() => {
+  // 1. 周统计数据 (Stacked Bar Data)
+  const weeklyStats = useMemo(() => {
+    // 获取当前选中日期的那一周
+    const weekStart = startOfWeek(currentDate)
+    const weekEnd = endOfWeek(currentDate)
+    
+    // 初始化 7 天的数据结构
+    const data = Array(7).fill(0).map((_, i) => {
+       const dayData: any = { name: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][i] }
+       // 初始化所有情绪为 0 (为了堆叠图不出错)
+       MOODS.forEach(m => dayData[m.name] = 0)
+       return dayData
+    })
+
+    // 填充数据
+    entries.filter(e => {
+      const d = parseISO(e.created_at)
+      return d >= weekStart && d <= weekEnd
+    }).forEach(e => {
+      const dayIndex = getDay(parseISO(e.created_at))
+      const moodName = MOODS.find(m => m.name === e.mood)?.name || 'Other'
+      data[dayIndex][moodName] += 1
+    })
+    
+    return data
+  }, [entries, currentDate])
+
+  // 2. 月统计数据 (Pie Chart)
+  const monthlyEntries = entries.filter(e => isSameMonth(parseISO(e.created_at), currentDate))
+  
+  const monthlyStats = useMemo(() => {
     const stats: Record<string, number> = {}
     monthlyEntries.forEach(e => {
-      const mood = e.mood || 'Unknown'
+      const mood = MOODS.find(m => m.name === e.mood)?.name || 'Other'
       stats[mood] = (stats[mood] || 0) + 1
     })
-    // 转换成数组并排序
+    // 转数组并排序
     return Object.entries(stats)
-      .map(([name, value]) => ({ name, value, fill: getColor(name) }))
+      .map(([name, value]) => ({ name, value, color: MOODS.find(m => m.name === name)?.color }))
       .sort((a, b) => b.value - a.value)
   }, [monthlyEntries])
 
-  // 2. 每周情绪韵律 (Weekday Bar Chart)
-  // 统计周一到周日，哪天也是开心的多，哪天焦虑的多
-  const weekdayStats = useMemo(() => {
-    const data = [
-      { name: 'Sun', total: 0, joyScore: 0 },
-      { name: 'Mon', total: 0, joyScore: 0 },
-      { name: 'Tue', total: 0, joyScore: 0 },
-      { name: 'Wed', total: 0, joyScore: 0 },
-      { name: 'Thu', total: 0, joyScore: 0 },
-      { name: 'Fri', total: 0, joyScore: 0 },
-      { name: 'Sat', total: 0, joyScore: 0 },
-    ]
-    
-    monthlyEntries.forEach(e => {
-      const date = parseISO(e.created_at)
-      const dayIndex = getDay(date) // 0 is Sunday
-      data[dayIndex].total += 1
-      
-      // 简单粗暴算法：开心/兴奋/骄傲/爱 +1分
-      if (['Joy', 'Excited', 'Proud', 'Love', 'Calm'].includes(e.mood)) {
-        data[dayIndex].joyScore += 1
-      }
-    })
-    return data
-  }, [monthlyEntries])
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] p-4 md:p-8 flex flex-col items-center text-[#1F2937] pb-20">
-      
-      <div className="max-w-lg w-full space-y-6">
+    <div className="min-h-screen bg-[#FAFAFA] p-4 md:p-8 flex flex-col items-center text-[#1F2937] pb-32">
+      <div className="max-w-lg w-full space-y-8">
         
-        {/* 1. 高级搜索栏 */}
+        {/* 1. 搜索栏 (保持不变) */}
         <div className="relative z-20">
           <div className="flex items-center bg-white border border-gray-200 rounded-2xl shadow-sm p-2 transition-shadow focus-within:shadow-md focus-within:border-blue-200">
             <Search size={20} className="text-gray-400 ml-2" />
             <input 
               type="text" 
-              placeholder={filterMood ? `Filtered by ${filterMood}...` : "Search memories..."}
+              placeholder={filterMood ? `Filtered: ${filterMood}` : "Search memories..."}
               value={searchText}
-              onChange={(e) => { setSearchText(e.target.value); setFilterMood(null) }} // 输入文字时清除心情筛选
+              onChange={(e) => { setSearchText(e.target.value); setFilterMood(null) }}
               className="flex-1 px-3 py-2 bg-transparent outline-none text-sm text-gray-700 placeholder-gray-400"
             />
-            
-            {/* 筛选按钮 */}
-            <button 
-              onClick={() => setShowFilterMenu(!showFilterMenu)}
-              className={`p-2 rounded-xl transition-colors flex items-center gap-2 ${filterMood ? 'bg-orange-100 text-orange-600' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
-            >
-              {filterMood ? (
-                <>
-                   <span>{MOODS.find(m => m.name === filterMood)?.emoji}</span>
-                   <X size={14} onClick={(e) => { e.stopPropagation(); setFilterMood(null) }} />
-                </>
-              ) : (
-                <Filter size={18} />
-              )}
+            <button onClick={() => setShowFilterMenu(!showFilterMenu)} className={`p-2 rounded-xl transition-colors flex items-center gap-2 ${filterMood ? 'bg-orange-100 text-orange-600' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}>
+              {filterMood ? <><span className="text-lg">{MOODS.find(m => m.name === filterMood)?.emoji}</span><X size={14} onClick={(e) => { e.stopPropagation(); setFilterMood(null) }} /></> : <Filter size={18} />}
             </button>
           </div>
-
-          {/* 筛选下拉菜单 (Dropdown) */}
           {showFilterMenu && (
-            <div className="absolute top-full right-0 mt-2 w-full bg-white rounded-2xl shadow-xl border border-gray-100 p-4 animate-in fade-in slide-in-from-top-2">
+            <div className="absolute top-full right-0 mt-2 w-full bg-white rounded-2xl shadow-xl border border-gray-100 p-4 animate-in fade-in z-50">
                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Filter by Mood</h4>
                <div className="flex flex-wrap gap-2">
                  {MOODS.map(m => (
-                   <button 
-                     key={m.name}
-                     onClick={() => { setFilterMood(m.name); setSearchText(''); setShowFilterMenu(false) }}
-                     className="px-3 py-2 bg-gray-50 hover:bg-orange-50 border border-gray-100 rounded-xl text-xs font-medium flex items-center gap-1 transition-colors"
-                   >
+                   <button key={m.name} onClick={() => { setFilterMood(m.name); setSearchText(''); setShowFilterMenu(false) }} className="px-3 py-2 bg-gray-50 hover:bg-orange-50 border border-gray-100 rounded-xl text-xs font-medium flex items-center gap-1 transition-colors">
                      <span>{m.emoji}</span> {m.name}
                    </button>
                  ))}
@@ -173,25 +152,18 @@ export default function CalendarPage() {
           )}
         </div>
 
-        {/* 2. 谷歌风日历卡片 */}
+        {/* 2. 日历 (保持不变) */}
         <div className="bg-white rounded-[32px] shadow-sm border border-gray-200 p-6">
-          {/* 头部：月份切换 */}
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-black text-gray-800 pl-1 tracking-tight">
-              {format(currentDate, 'MMMM yyyy')}
-            </h2>
+            <h2 className="text-xl font-black text-gray-800 pl-1 tracking-tight">{format(currentDate, 'MMMM yyyy')}</h2>
             <div className="flex gap-2">
-              <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-full text-gray-500 transition-colors"><ChevronLeft size={20}/></button>
-              <button onClick={() => setCurrentDate(new Date())} className="text-xs font-bold px-3 py-1 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors">Today</button>
-              <button onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-full text-gray-500 transition-colors"><ChevronRight size={20}/></button>
+              <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-full text-gray-500"><ChevronLeft size={20}/></button>
+              <button onClick={() => setCurrentDate(new Date())} className="text-xs font-bold px-3 py-1 bg-gray-100 rounded-full hover:bg-gray-200">Today</button>
+              <button onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-full text-gray-500"><ChevronRight size={20}/></button>
             </div>
           </div>
-
-          {/* 日历网格 */}
           <div className="grid grid-cols-7 mb-2">
-            {['S','M','T','W','T','F','S'].map(d => (
-              <div key={d} className="text-center text-[10px] font-bold text-gray-400 py-2">{d}</div>
-            ))}
+            {['S','M','T','W','T','F','S'].map(d => <div key={d} className="text-center text-[10px] font-bold text-gray-400 py-2">{d}</div>)}
           </div>
           <div className="grid grid-cols-7 gap-y-2 gap-x-1">
             {emptyDays.map((_, i) => <div key={`empty-${i}`} />)}
@@ -199,18 +171,10 @@ export default function CalendarPage() {
               const status = checkDateStatus(day)
               const isToday = isSameDay(day, new Date())
               return (
-                <div key={day.toString()} className="flex flex-col items-center justify-center aspect-square relative group cursor-default">
-                  <div className={`
-                    w-8 h-8 flex items-center justify-center rounded-full text-xs font-medium transition-all duration-300
-                    ${isToday && status === 'empty' ? 'bg-black text-white' : ''} 
-                    ${status === 'empty' && !isToday ? 'text-gray-400 hover:bg-gray-50' : ''}
-                    ${status === 'has-entry' ? 'bg-gray-100 text-gray-900 font-bold' : ''} 
-                    ${status === 'match' ? 'bg-orange-400 text-white shadow-md scale-110 ring-2 ring-orange-100' : ''}
-                    ${status === 'dim' ? 'text-gray-200' : ''}
-                  `}>
+                <div key={day.toString()} className="flex flex-col items-center justify-center aspect-square relative">
+                  <div className={`w-8 h-8 flex items-center justify-center rounded-full text-xs font-medium transition-all ${isToday && status === 'empty' ? 'bg-black text-white' : ''} ${status === 'empty' && !isToday ? 'text-gray-400 hover:bg-gray-50' : ''} ${status === 'has-entry' ? 'bg-gray-100 text-gray-900 font-bold' : ''} ${status === 'match' ? 'bg-orange-400 text-white shadow-md scale-110 ring-2 ring-orange-100' : ''} ${status === 'dim' ? 'text-gray-200' : ''}`}>
                     {format(day, 'd')}
                   </div>
-                  {/* 小圆点标记 */}
                   {status === 'has-entry' && !filterMood && !searchText && <div className="w-1 h-1 bg-gray-300 rounded-full mt-1"></div>}
                   {status === 'match' && <div className="w-1 h-1 bg-orange-200 rounded-full mt-1"></div>}
                 </div>
@@ -219,89 +183,116 @@ export default function CalendarPage() {
           </div>
         </div>
 
-        {/* 3. 统计看板 (Analytics) */}
-        {/* 只有当本月有数据时才显示 */}
-        {monthlyEntries.length > 0 && (
-          <div className="space-y-4 animate-in slide-in-from-bottom-4 fade-in duration-500">
-             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Monthly Insights</h3>
+        {/* --- 3. 每周洞察 (Weekly Insights - 永远显示) --- */}
+        <div className="bg-white p-6 rounded-[32px] border border-gray-200 shadow-sm">
+           <div className="flex items-center gap-2 mb-6">
+              <TrendingUp size={18} className="text-orange-500" />
+              <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wider">This Week's Emotions</h3>
+           </div>
+           
+           <div className="h-48 w-full">
+              {/* 堆叠柱状图：所有情绪都显示在柱子上 */}
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={weeklyStats} barSize={12}>
+                  <XAxis dataKey="name" tick={{fontSize: 10, fill:'#9CA3AF'}} axisLine={false} tickLine={false} dy={10} />
+                  <RechartsTooltip 
+                     cursor={{fill: '#F3F4F6'}}
+                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px' }}
+                  />
+                  {/* 循环渲染每种情绪的 Bar，stackId='a' 表示它们会堆在一起 */}
+                  {MOODS.map(mood => (
+                    <Bar 
+                      key={mood.name} 
+                      dataKey={mood.name} 
+                      stackId="a" 
+                      fill={mood.color} 
+                      radius={[2, 2, 2, 2]} // 小圆角
+                    />
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+           </div>
+           <p className="text-[10px] text-gray-400 text-center mt-4">
+             Stacked view of all your moods this week
+           </p>
+        </div>
+
+
+        {/* --- 4. 月度深度洞察 (Monthly Insights - 带解锁逻辑) --- */}
+        <div className="relative">
+          {/* 标题 */}
+          <div className="flex items-center justify-between mb-4 px-2">
+             <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider">Monthly Report</h3>
+             {daysActive < 15 && <span className="text-[10px] bg-gray-100 px-2 py-1 rounded text-gray-500">{15 - daysActive} days left</span>}
+          </div>
+
+          {/* 内容容器 */}
+          <div className={`bg-white p-6 rounded-[32px] border border-gray-200 shadow-sm transition-all ${daysActive < 15 ? 'blur-sm opacity-60 select-none pointer-events-none' : ''}`}>
              
-             {/* 统计卡片组 */}
-             <div className="grid grid-cols-2 gap-4">
-                
-                {/* 卡片 A: 情绪分布 (Pie) */}
-                <div className="bg-white p-5 rounded-[24px] border border-gray-100 shadow-sm">
-                   <h4 className="text-sm font-bold text-gray-700 mb-4">Mood Mix</h4>
-                   <div className="h-32 w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={moodStats}
-                            cx="50%" cy="50%"
-                            innerRadius={25} outerRadius={40}
-                            paddingAngle={5}
-                            dataKey="value"
-                          >
-                            {moodStats.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.fill} stroke="none" />
-                            ))}
-                          </Pie>
-                          <Tooltip 
-                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px' }}
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
-                   </div>
-                   <div className="flex flex-wrap justify-center gap-2 mt-2">
-                      {moodStats.slice(0, 3).map(stat => (
-                        <div key={stat.name} className="flex items-center gap-1 text-[10px] text-gray-500">
-                           <div className="w-2 h-2 rounded-full" style={{ background: stat.fill }}></div>
-                           {stat.name} {Math.round((stat.value / monthlyEntries.length) * 100)}%
-                        </div>
-                      ))}
+             <div className="flex flex-col md:flex-row gap-8 items-center">
+                {/* 左侧：甜甜圈图 */}
+                <div className="w-40 h-40 relative shrink-0">
+                   <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={monthlyStats}
+                          innerRadius={35}
+                          outerRadius={55}
+                          paddingAngle={4}
+                          dataKey="value"
+                        >
+                          {monthlyStats.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color || '#ddd'} stroke="none" />
+                          ))}
+                        </Pie>
+                      </PieChart>
+                   </ResponsiveContainer>
+                   {/* 中间显示的数字 */}
+                   <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-2xl font-bold text-gray-800">{monthlyEntries.length}</span>
+                      <span className="text-[8px] text-gray-400 uppercase">Entries</span>
                    </div>
                 </div>
 
-                {/* 卡片 B: 每周韵律 (Bar) */}
-                <div className="bg-white p-5 rounded-[24px] border border-gray-100 shadow-sm">
-                   <h4 className="text-sm font-bold text-gray-700 mb-4">Happy Days</h4>
-                   <div className="h-32 w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={weekdayStats}>
-                          <XAxis dataKey="name" tick={{fontSize: 8, fill:'#9CA3AF'}} axisLine={false} tickLine={false} />
-                          <Tooltip 
-                             cursor={{fill: '#F3F4F6'}}
-                             contentStyle={{ borderRadius: '8px', border: 'none', fontSize: '12px' }}
-                          />
-                          {/* 总数背景柱 */}
-                          <Bar dataKey="total" stackId="a" fill="#F3F4F6" radius={[4, 4, 4, 4]} />
-                          {/* 开心指数前景柱 */}
-                          <Bar dataKey="joyScore" stackId="b" fill="#FBBF24" radius={[4, 4, 4, 4]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                   </div>
-                   <p className="text-[10px] text-gray-400 text-center mt-2">
-                     Which weekday are you happiest?
-                   </p>
-                </div>
-
-             </div>
-             
-             {/* 卡片 C: 简单汇总 */}
-             <div className="bg-black text-white p-6 rounded-[24px] flex justify-between items-center shadow-lg">
-                <div>
-                   <div className="text-2xl font-bold">{monthlyEntries.length}</div>
-                   <div className="text-[10px] text-white/60 uppercase tracking-wider">Memories Created</div>
-                </div>
-                <div className="text-right">
-                   <div className="text-2xl font-bold text-orange-400">
-                     {monthlyEntries.filter(e => e.image_url).length}
-                   </div>
-                   <div className="text-[10px] text-white/60 uppercase tracking-wider">Photos Taken</div>
+                {/* 右侧：详细列表 (Mood Summary) */}
+                <div className="flex-1 w-full space-y-3">
+                   {monthlyStats.length > 0 ? monthlyStats.slice(0, 5).map(stat => (
+                      <div key={stat.name} className="flex items-center justify-between text-xs">
+                         <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full" style={{ background: stat.color }}></div>
+                            <span className="font-bold text-gray-600">{stat.name}</span>
+                         </div>
+                         <div className="flex items-center gap-2">
+                            <span className="font-mono text-gray-400">{stat.value}</span>
+                            <span className="text-[10px] text-gray-300 w-8 text-right">
+                               {Math.round((stat.value / monthlyEntries.length) * 100)}%
+                            </span>
+                         </div>
+                      </div>
+                   )) : (
+                     <div className="text-center text-xs text-gray-300 py-4">No data this month</div>
+                   )}
                 </div>
              </div>
 
           </div>
-        )}
+
+          {/* 🔒 锁定遮罩层 (如果天数不够，显示这个) */}
+          {daysActive < 15 && (
+             <div className="absolute inset-0 z-10 flex items-center justify-center">
+                <div className="bg-white/80 backdrop-blur-md p-6 rounded-3xl shadow-xl border border-white text-center max-w-xs">
+                   <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3 text-gray-400">
+                      <Lock size={24} />
+                   </div>
+                   <h4 className="font-bold text-gray-800 mb-1">Unlock Monthly Insights</h4>
+                   <p className="text-xs text-gray-500 leading-relaxed">
+                      Keep tracking for <strong>{15 - daysActive} more days</strong> to unlock deep analysis of your emotional trends.
+                   </p>
+                </div>
+             </div>
+          )}
+
+        </div>
 
       </div>
     </div>

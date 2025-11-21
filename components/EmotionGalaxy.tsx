@@ -19,7 +19,7 @@ type Entry = {
 const COLORS: Record<string, string> = {
   'Joy': '#FFD700', 'Calm': '#00FFCC', 'Neutral': '#FFFFFF', 'Tired': '#8A2BE2',
   'Stressed': '#FF4500', 'Angry': '#FF0000', 'Crying': '#00BFFF', 'Excited': '#FF1493',
-  'Sick': '#32CD32', 'Proud': '#FF8C00', 'Love': '#FF69B4'
+  'Sick': '#32CD32', 'Proud': '#FF8C00', 'Love': '#FF69B4','Food': '#FFA500'
 }
 
 function Connections({ positions, color }: { positions: THREE.Vector3[], color: string }) {
@@ -199,10 +199,8 @@ function DetailModal({ entry, onClose }: { entry: Entry; onClose: () => void }) 
 export default function EmotionGalaxy({ entries, filter }: { entries: Entry[], filter: string | null }) {
   const [selectedEntry, setSelectedEntry] = useState<Entry | null>(null)
 
-  const filteredEntries = useMemo(() => {
-    if (!filter) return entries
-    return entries.filter(e => e.mood === filter)
-  }, [entries, filter])
+  // 直接用传进来的 entries，因为父组件已经筛好了
+  const filteredEntries = entries
 
   const positions = useMemo(() => {
     const count = filteredEntries.length
