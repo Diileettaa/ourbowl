@@ -4,32 +4,20 @@ import { supabase } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import EmotionGalaxy from '@/components/EmotionGalaxy'
-import { useEffect, useState, useMemo } from 'react'
-import { ArrowLeft, Plus, Utensils } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ArrowLeft } from 'lucide-react'
 
-const MAIN_MOODS = [
+const MOODS = [
   { name: 'Joy', emoji: '🥰', color: 'bg-yellow-500' },
-  { name: 'Calm', emoji: '🌿', color: 'bg-emerald-500' },
+  { name: 'Calm', emoji: '🙂', color: 'bg-emerald-500' },
   { name: 'Tired', emoji: '😴', color: 'bg-indigo-500' },
   { name: 'Stressed', emoji: '🤯', color: 'bg-red-500' },
   { name: 'Sad', emoji: '💧', color: 'bg-blue-500' },
 ]
 
-const OTHER_MOODS = [
-  { name: 'Angry', emoji: '🤬' },
-  { name: 'Crying', emoji: '😭' },
-  { name: 'Excited', emoji: '🎉' },
-  { name: 'Sick', emoji: '🤢' },
-  { name: 'Proud', emoji: '😎' },
-  { name: 'Love', emoji: '❤️' },
-  { name: 'Other', emoji: '💭' },
-]
-
 export default function ExplorationPage() {
   const [entries, setEntries] = useState<any[]>([])
   const [filter, setFilter] = useState<string | null>(null)
-  const [showFoodOnly, setShowFoodOnly] = useState(false)
-  const [showMore, setShowMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
@@ -37,6 +25,7 @@ export default function ExplorationPage() {
     const getData = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/'); return }
+
       const { data } = await supabase.from('entries').select('*').order('created_at', { ascending: false })
       setEntries(data || [])
       setLoading(false)
@@ -44,108 +33,48 @@ export default function ExplorationPage() {
     getData()
   }, [])
 
-  const filteredEntries = useMemo(() => {
-    let result = entries
-    if (showFoodOnly) {
-      result = entries.filter(e => e.meal_type && e.meal_type !== 'Life')
-    } else if (filter === 'Other') {
-      const allStandardMoods = [...MAIN_MOODS, ...OTHER_MOODS].map(m => m.name).filter(n => n !== 'Other')
-      result = entries.filter(e => !allStandardMoods.includes(e.mood))
-    } else if (filter) {
-      result = entries.filter(e => e.mood === filter)
-    }
-    return result
-  }, [entries, filter, showFoodOnly])
-
-  const handleFilterClick = (moodName: string | null) => {
-    setShowFoodOnly(false)
-    setFilter(filter === moodName ? null : moodName)
-  }
-
-  const handleFoodClick = () => {
-    setFilter(null)
-    setShowFoodOnly(!showFoodOnly)
-  }
-
   return (
-    // ✨ 布局修复核心：
-    // 1. fixed inset-0: 钉死四个角，强制全屏。
-    // 2. z-[100]: 盖住原来的白色 NavBar，解决冲突。
-    // 3. flex flex-col: 竖向排列，让中间的 Canvas 自动撑满剩余空间。
-    <div className="fixed inset-0 z-[100] bg-black overflow-hidden flex flex-col">
+    // ✨ 关键：h-screen w-screen fixed inset-0 -> 锁死屏幕，不允许滚动
+    <div className="fixed inset-0 bg-black overflow-hidden">
       
-      {/* 1. 顶部栏 (Header) */}
-      <div className="relative z-20 p-6 flex justify-between items-start pointer-events-none shrink-0">
+      {/* 1. 顶部悬浮栏 */}
+      <div className="absolute top-0 left-0 w-full z-20 p-6 flex justify-between items-start pointer-events-none">
         <div>
           <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-200 via-purple-200 to-pink-200 tracking-tighter drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]">
-            {showFoodOnly ? 'FOOD UNIVERSE' : filter ? `${filter.toUpperCase()} GALAXY` : 'MEMORY GALAXY'}
+            {filter ? `${filter} Universe` : 'MEMORY GALAXY'}
           </h1>
           <p className="text-white/50 text-xs font-mono mt-2 uppercase tracking-[0.3em]">
-            {filteredEntries.length} Stars Found
+            {entries.length} Memories Found
           </p>
         </div>
+
         <Link href="/dashboard" className="pointer-events-auto flex items-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 rounded-full text-white font-bold transition-all hover:scale-105 active:scale-95">
-          <ArrowLeft size={18} /> Back to Earth
+          <ArrowLeft size={18} /> Back
         </Link>
       </div>
 
-      {/* 2. 中间：3D 舞台 (flex-1 自动填满中间所有空间) */}
-      <div className="flex-1 relative z-0 w-full min-h-0">
-        {loading ? (
-          <div className="flex items-center justify-center h-full text-white/30 font-mono animate-pulse">Loading Galaxy...</div>
-        ) : (
-          <EmotionGalaxy 
-             entries={filteredEntries} 
-             filter={showFoodOnly ? 'Food' : filter} 
-          />
-        )}
+      {/* 2. 底部筛选器 (固定在底部 30px) */}
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 w-full max-w-2xl px-4 pointer-events-auto flex justify-center">
+        <div className="flex items-center gap-3 bg-black/60 backdrop-blur-xl border border-white/10 p-2 rounded-2xl shadow-2xl overflow-x-auto no-scrollbar max-w-full">
+          <button onClick={() => setFilter(null)} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${filter === null ? 'bg-white text-black' : 'text-white/60 hover:bg-white/10 hover:text-white'}`}>
+            All Stars
+          </button>
+          <div className="w-px h-6 bg-white/10 shrink-0"></div>
+          {MOODS.map((m) => (
+            <button key={m.name} onClick={() => setFilter(filter === m.name ? null : m.name)} className={`px-3 py-2 rounded-xl flex items-center gap-2 transition-all border shrink-0 ${filter === m.name ? 'bg-white/10 border-white/50 text-white shadow-[0_0_15px_rgba(255,255,255,0.2)] scale-105' : 'border-transparent text-white/50 hover:text-white hover:bg-white/5'}`}>
+              <span className="text-lg filter drop-shadow-lg">{m.emoji}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* 3. 底部筛选器 (Footer) */}
-      {/* shrink-0 防止被挤压，pb-8 留出底部安全距离 */}
-      <div className="relative z-20 w-full flex justify-center pointer-events-auto shrink-0 pb-8 pt-4">
-         <div className="flex flex-col items-center gap-3 max-w-[90vw]">
-            
-            {/* 展开的更多菜单 */}
-            {showMore && (
-              <div className="flex flex-wrap justify-center gap-2 bg-black/80 backdrop-blur-xl border border-white/10 p-3 rounded-2xl shadow-2xl animate-in slide-in-from-bottom-2 mb-1">
-                {OTHER_MOODS.map((m) => (
-                  <button
-                    key={m.name}
-                    onClick={() => { handleFilterClick(m.name); setShowMore(false); }}
-                    className={`px-3 py-1.5 rounded-xl flex items-center gap-2 transition-all border ${
-                      filter === m.name
-                      ? 'bg-white/20 border-white/50 text-white shadow-lg scale-105'
-                      : 'border-transparent text-white/60 hover:text-white hover:bg-white/10'
-                    }`}
-                  >
-                    <span className="text-base">{m.emoji}</span>
-                    <span className="text-xs font-bold uppercase">{m.name}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* 主菜单 */}
-            <div className="flex items-center gap-2 bg-black/60 backdrop-blur-xl border border-white/10 p-2 rounded-2xl shadow-2xl overflow-x-auto no-scrollbar max-w-full">
-              <button onClick={() => { setFilter(null); setShowFoodOnly(false); }} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${!filter && !showFoodOnly ? 'bg-white text-black' : 'text-white/60 hover:bg-white/10 hover:text-white'}`}>
-                All Stars
-              </button>
-              <div className="w-px h-6 bg-white/10 shrink-0 mx-1"></div>
-              {MAIN_MOODS.map((m) => (
-                <button key={m.name} onClick={() => handleFilterClick(m.name)} className={`px-3 py-2 rounded-xl flex items-center gap-2 transition-all border shrink-0 ${filter === m.name ? 'bg-white/10 border-white/50 text-white shadow-[0_0_15px_rgba(255,255,255,0.2)] scale-105' : 'border-transparent text-white/50 hover:text-white hover:bg-white/5'}`}>
-                  <span className="text-lg filter drop-shadow-lg">{m.emoji}</span>
-                </button>
-              ))}
-              <div className="w-px h-6 bg-white/10 shrink-0 mx-1"></div>
-              <button onClick={handleFoodClick} className={`px-3 py-2 rounded-xl flex items-center gap-2 transition-all border shrink-0 ${showFoodOnly ? 'bg-orange-500/20 border-orange-500/50 text-orange-200 shadow-[0_0_15px_rgba(255,165,0,0.2)] scale-105' : 'border-transparent text-white/50 hover:text-white hover:bg-white/5'}`}>
-                 <Utensils size={18} />
-              </button>
-              <button onClick={() => setShowMore(!showMore)} className={`px-3 py-2 rounded-xl flex items-center gap-2 transition-all border shrink-0 ${showMore ? 'bg-white/20 text-white' : 'border-transparent text-white/50 hover:text-white hover:bg-white/5'}`}>
-                 <Plus size={18} />
-              </button>
-            </div>
-         </div>
+      {/* 3. 3D 舞台 (占满全屏) */}
+      <div className="absolute inset-0 z-0">
+        {loading ? (
+          <div className="flex items-center justify-center h-full text-white/30 font-mono animate-pulse">Loading...</div>
+        ) : (
+          <EmotionGalaxy entries={entries} filter={filter} />
+        )}
       </div>
 
     </div>

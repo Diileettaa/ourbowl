@@ -19,7 +19,7 @@ type Entry = {
 const COLORS: Record<string, string> = {
   'Joy': '#FFD700', 'Calm': '#00FFCC', 'Neutral': '#FFFFFF', 'Tired': '#8A2BE2',
   'Stressed': '#FF4500', 'Angry': '#FF0000', 'Crying': '#00BFFF', 'Excited': '#FF1493',
-  'Sick': '#32CD32', 'Proud': '#FF8C00', 'Love': '#FF69B4', 'Food': '#FFA500'
+  'Sick': '#32CD32', 'Proud': '#FF8C00', 'Love': '#FF69B4'
 }
 
 function Connections({ positions, color }: { positions: THREE.Vector3[], color: string }) {
@@ -38,9 +38,9 @@ function Connections({ positions, color }: { positions: THREE.Vector3[], color: 
     <Line
       points={lines}
       color={color}
-      opacity={0.1} // 稍微调高一点，让连线看得见
+      opacity={0.05}
       transparent
-      lineWidth={1}
+      lineWidth={0.5}
       segments
     />
   )
@@ -74,8 +74,9 @@ function GravityPlanet({
 
     if (isAnySelected) {
       if (isSelected) {
-        targetPos.set(0, 1.5, 8) // 主角位置
-        targetScale = 1.5 
+        // 选中时飞到侧上方，把中间位置留给大弹窗
+        targetPos.set(0, 3, 8) 
+        targetScale = 1.4
       } else {
         targetPos.multiplyScalar(0.4) 
         targetScale = 0.4
@@ -93,7 +94,7 @@ function GravityPlanet({
   })
 
   const getEmissiveIntensity = () => {
-    if (isSelected) return 3.0
+    if (isSelected) return 3.5
     if (isAnySelected) return 0.2
     if (hovered) return 2.0
     return 0.5
@@ -107,16 +108,14 @@ function GravityPlanet({
         onPointerOver={() => { if(!isAnySelected) { document.body.style.cursor = 'pointer'; setHover(true) } }}
         onPointerOut={() => { document.body.style.cursor = 'auto'; setHover(false) }}
       >
-        {/* ✨ 关键修改：32, 32 让球体变得非常圆润，不再有多边形棱角 */}
         <sphereGeometry args={[0.5, 32, 32]} /> 
-        
         <meshPhysicalMaterial 
           color={baseColor}
           emissive={baseColor}
           emissiveIntensity={getEmissiveIntensity()}
           roughness={0.2}
           metalness={0.1}
-          transmission={0.6}
+          transmission={0.5}
           thickness={1.5}
           transparent
           opacity={isAnySelected && !isSelected ? 0.3 : 0.9}
@@ -126,11 +125,13 @@ function GravityPlanet({
   )
 }
 
+// --- ✨ 3. 重点修改：博物馆级大弹窗 ---
 function DetailModal({ entry, onClose }: { entry: Entry; onClose: () => void }) {
   const color = COLORS[entry.mood] || '#FFFFFF'
   
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none p-4 md:p-12">
+      {/* 卡片本体：根据是否有图来决定宽度 */}
       <div 
         className={`pointer-events-auto bg-black/80 backdrop-blur-2xl border border-white/10 rounded-[32px] shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-500 flex flex-col md:flex-row ${entry.image_url ? 'max-w-4xl w-full h-[60vh] md:h-[500px]' : 'max-w-md w-full'}`}
         style={{ 
@@ -142,8 +143,10 @@ function DetailModal({ entry, onClose }: { entry: Entry; onClose: () => void }) 
           <X size={20} />
         </button>
 
+        {/* --- 左侧：照片区 (如果有照片) --- */}
         {entry.image_url && (
           <div className="relative w-full md:w-3/5 h-1/2 md:h-full bg-black/50 flex items-center justify-center p-4 border-b md:border-b-0 md:border-r border-white/10">
+             {/* object-contain: 保证照片完整显示，绝不裁剪 */}
              <img 
                src={entry.image_url} 
                className="max-w-full max-h-full object-contain rounded-lg shadow-lg" 
@@ -152,7 +155,10 @@ function DetailModal({ entry, onClose }: { entry: Entry; onClose: () => void }) 
           </div>
         )}
 
+        {/* --- 右侧：文字信息区 --- */}
         <div className={`flex-1 flex flex-col p-6 md:p-8 ${entry.image_url ? 'h-1/2 md:h-full' : ''} overflow-y-auto`}>
+          
+          {/* 头部 Mood */}
           <div className="flex items-center gap-4 mb-6 shrink-0">
              <div className="w-14 h-14 rounded-full flex items-center justify-center text-3xl bg-white/5 shadow-inner border border-white/10">
                 {entry.mood === 'Joy' ? '🥰' : '✨'}
@@ -172,13 +178,19 @@ function DetailModal({ entry, onClose }: { entry: Entry; onClose: () => void }) 
                 </div>
              </div>
           </div>
+
+          {/* 装饰线 */}
           <div className="w-full h-px bg-gradient-to-r from-white/20 to-transparent mb-6 shrink-0"></div>
+
+          {/* 文字内容 */}
           <div className="relative pl-4 border-l-2 flex-1 overflow-y-auto pr-2" style={{ borderColor: `${color}60` }}>
              <p className="text-white/90 leading-loose font-medium text-lg whitespace-pre-wrap">
                {entry.content}
              </p>
           </div>
+
         </div>
+
       </div>
     </div>
   )
@@ -214,21 +226,30 @@ export default function EmotionGalaxy({ entries, filter }: { entries: Entry[], f
 
   return (
     <div className="w-full h-full bg-black relative">
+      
       {selectedEntry && <DetailModal entry={selectedEntry} onClose={() => setSelectedEntry(null)} />}
+
       <Canvas camera={{ position: [0, 0, 24], fov: 45 }} dpr={[1, 2]}>
         <color attach="background" args={['#050508']} />
         <fog attach="fog" args={['#050508', 20, 60]} />
+
         {/* @ts-ignore */}
         <EffectComposer disableNormalPass>
           <Bloom luminanceThreshold={0.2} mipmapBlur intensity={1.5} radius={0.6} />
         </EffectComposer>
+
         <ambientLight intensity={0.1} />
         <pointLight position={[10, 10, 10]} intensity={1} color={universeColor} />
+
         <Stars radius={100} depth={50} count={6000} factor={4} saturation={0} fade speed={0.5} />
         <Sparkles count={100} scale={12} size={2} speed={0.2} opacity={0.3} color={universeColor} />
+
         <Float speed={1} rotationIntensity={0.1} floatIntensity={0.2}>
           <group>
-             {!selectedEntry && <Connections positions={positions} color={universeColor} />}
+             {!selectedEntry && (
+                <Connections positions={positions} color={universeColor} />
+             )}
+
              {filteredEntries.map((entry, i) => (
                 <GravityPlanet 
                   key={entry.id} 
@@ -241,6 +262,7 @@ export default function EmotionGalaxy({ entries, filter }: { entries: Entry[], f
              ))}
           </group>
         </Float>
+
         <OrbitControls 
           enableZoom={!selectedEntry} 
           enablePan={false} 
