@@ -1,7 +1,7 @@
 'use client'
 
 import { Canvas, useFrame } from '@react-three/fiber'
-import { OrbitControls, Float, Stars, Sparkles, Line } from '@react-three/drei'
+import { OrbitControls, Float, Stars, Sparkles, Line, Text } from '@react-three/drei'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
@@ -22,11 +22,11 @@ const COLORS: Record<string, string> = {
   'Sick': '#32CD32', 'Proud': '#FF8C00', 'Love': '#FF69B4'
 }
 
-// --- 1. 极细微连线组件 ---
+// --- 1. 连线组件 (调整为极淡) ---
 function Connections({ positions, color }: { positions: THREE.Vector3[], color: string }) {
   const lines = useMemo(() => {
     const points: THREE.Vector3[] = []
-    // 只连接最近的邻居，减少线条数量
+    // 连接逻辑：只连最近的邻居，减少杂乱感
     for (let i = 0; i < positions.length; i++) {
       if (i + 1 < positions.length) {
         points.push(positions[i])
@@ -40,15 +40,15 @@ function Connections({ positions, color }: { positions: THREE.Vector3[], color: 
     <Line
       points={lines}
       color={color}
-      opacity={0.03} // ✨ 极度微弱，只有 3% 的不透明度，像呼吸一样若隐若现
+      opacity={0.05} // ✨ 5% 透明度，像烟雾一样淡
       transparent
-      lineWidth={0.5} // 线条变细
+      lineWidth={0.5} // 极细线条
       segments
     />
   )
 }
 
-// --- 2. 拥有光影逻辑的星球 ---
+// --- 2. 星球组件 (核心光影逻辑) ---
 function GravityPlanet({ 
   entry, 
   originalPos, 
@@ -66,72 +66,72 @@ function GravityPlanet({
   const [hovered, setHover] = useState(false)
   const baseColor = COLORS[entry.mood] || '#FFFFFF'
   
-  // 随机参数
   const randomSpeed = useMemo(() => 0.5 + Math.random() * 1.5, [])
   const randomOffset = useMemo(() => Math.random() * 100, [])
 
   useFrame((state) => {
     if (!meshRef.current) return
     
-    // --- 1. 目标位置计算 ---
+    // --- 1. 目标位置与大小 ---
     let targetPos = new THREE.Vector3(...originalPos)
     let targetScale = 1.0
 
     if (isAnySelected) {
       if (isSelected) {
-        // ✨ 选中状态：飞到 (0, 1, 10)
-        // 不再贴脸 (Z=12)，稍微远一点 (Z=10)，且稍微靠上 (Y=1)，不挡住卡片
+        // ✨ 主角位置：Z=10 (不要太近，不然会糊脸)，Y=1.5 (稍微靠上，给卡片腾位置)
         targetPos.set(0, 1.5, 10) 
-        // ✨ 选中大小：不再变巨大 (2.5)，稍微变大一点点 (1.3) 作为点缀
-        targetScale = 1.3 
+        targetScale = 1.4 // 稍微变大即可，保持精致
       } else {
-        // 配角：被吸入深处，变成背景星尘
-        targetPos.multiplyScalar(0.2) 
-        targetScale = 0.3 // 变得很小
+        // 配角：退后并缩小，形成背景星尘
+        targetPos.multiplyScalar(0.4) 
+        targetScale = 0.4
       }
     } else {
-      // 默认状态：稍微大一点点方便点击
-      if (hovered) targetScale = 1.2
+      // 默认呼吸状态
+      if (hovered) targetScale = 1.3
     }
 
-    // --- 2. 呼吸动画 ---
+    // --- 2. 动画插值 ---
     const t = state.clock.getElapsedTime()
     const breathe = Math.sin(t * randomSpeed + randomOffset) * 0.05
     
-    // --- 3. 移动插值 ---
-    meshRef.current.position.lerp(targetPos, 0.08) // 移动稍微慢一点，更优雅
+    meshRef.current.position.lerp(targetPos, 0.08) // 0.08 的速度比较优雅
     meshRef.current.scale.setScalar(THREE.MathUtils.lerp(meshRef.current.scale.x, targetScale + breathe, 0.1))
     meshRef.current.rotation.y += 0.005
   })
 
-  // --- 4. 动态光亮度计算 (核心需求) ---
+  // --- 3. 这里的逻辑控制“亮度” ---
   const getEmissiveIntensity = () => {
-    if (isSelected) return 4.0 // ✨ 选中：爆亮！
-    if (isAnySelected) return 0.1 // 别人被选中：我变暗淡
-    if (hovered) return 2.0 // 悬停：稍微亮一点
-    return 0.6 // ✨ 平时：比较暗，像沉睡的宝石
+    if (isSelected) return 3.5 // ✨ 选中：高亮爆发 (配合 Bloom 特效)
+    if (isAnySelected) return 0.2 // 别人选中：我变暗淡
+    if (hovered) return 2.0 // 悬停：变亮提示
+    return 0.5 // ✨ 平时：暗淡的呼吸灯效果 (你想要的效果)
   }
 
   return (
-    <mesh 
-      ref={meshRef}
-      onClick={(e) => { e.stopPropagation(); onClick(entry) }}
-      onPointerOver={() => { if(!isAnySelected) { document.body.style.cursor = 'pointer'; setHover(true) } }}
-      onPointerOut={() => { document.body.style.cursor = 'auto'; setHover(false) }}
-    >
-      <icosahedronGeometry args={[0.5, 1]} /> 
-      <meshPhysicalMaterial 
-        color={baseColor}
-        emissive={baseColor}
-        emissiveIntensity={getEmissiveIntensity()} // 动态光强
-        roughness={0.1}
-        metalness={0.1}
-        transmission={0.6}
-        thickness={1.5}
-        transparent
-        opacity={isAnySelected && !isSelected ? 0.2 : 0.9} // 没选中时变得很透明
-      />
-    </mesh>
+    <group>
+      <mesh 
+        ref={meshRef}
+        onClick={(e) => { e.stopPropagation(); onClick(entry) }}
+        onPointerOver={() => { if(!isAnySelected) { document.body.style.cursor = 'pointer'; setHover(true) } }}
+        onPointerOut={() => { document.body.style.cursor = 'auto'; setHover(false) }}
+      >
+        {/* 用球体 geometry，分段数 32 保证足够圆 */}
+        <sphereGeometry args={[0.5, 32, 32]} /> 
+        
+        <meshPhysicalMaterial 
+          color={baseColor}
+          emissive={baseColor}
+          emissiveIntensity={getEmissiveIntensity()} // 动态光强
+          roughness={0.2}
+          metalness={0.1}
+          transmission={0.5} // 半透明玻璃感
+          thickness={1.5}
+          transparent
+          opacity={isAnySelected && !isSelected ? 0.3 : 0.9} // 没选中时变透明
+        />
+      </mesh>
+    </group>
   )
 }
 
@@ -141,17 +141,22 @@ function DetailModal({ entry, onClose }: { entry: Entry; onClose: () => void }) 
   
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
+      {/* 这里的 pointer-events-auto 保证卡片可以点，背景不能点 */}
       <div 
-        className="pointer-events-auto bg-black/40 backdrop-blur-2xl border border-white/10 p-6 rounded-[32px] max-w-sm w-full mx-4 shadow-[0_0_50px_rgba(0,0,0,0.5)] relative overflow-hidden animate-in zoom-in-95 duration-500 slide-in-from-bottom-5"
-        style={{ borderTop: `1px solid ${color}60` }} // 只有顶部有一点点颜色暗示
+        className="pointer-events-auto bg-black/60 backdrop-blur-xl border border-white/20 p-6 rounded-[32px] max-w-sm w-full mx-4 shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-500 slide-in-from-bottom-8"
+        style={{ 
+          boxShadow: `0 0 60px ${color}30`, // 根据心情颜色的光晕
+          borderTop: `1px solid ${color}80` 
+        }}
       >
-        <button onClick={onClose} className="absolute top-4 right-4 text-white/30 hover:text-white p-2 transition-colors">
+        <button onClick={onClose} className="absolute top-4 right-4 text-white/50 hover:text-white p-2 bg-white/5 rounded-full transition-colors">
           <X size={20} />
         </button>
 
         {/* 头部 */}
         <div className="flex items-center gap-4 mb-5">
-           <div className="w-12 h-12 rounded-full flex items-center justify-center text-2xl bg-white/5 shadow-inner">
+           <div className="w-12 h-12 rounded-full flex items-center justify-center text-2xl bg-white/10 shadow-inner">
+              {/* 简单的映射，如果你的 mood 是中文需要改这里 */}
               {entry.mood === 'Joy' ? '🥰' : '✨'}
            </div>
            <div>
@@ -163,7 +168,7 @@ function DetailModal({ entry, onClose }: { entry: Entry; onClose: () => void }) 
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-3 text-xs text-white/30 font-mono">
+              <div className="flex items-center gap-3 text-xs text-white/40 font-mono">
                  <span className="flex items-center gap-1"><Calendar size={10} /> {new Date(entry.created_at).toLocaleDateString()}</span>
                  <span className="flex items-center gap-1"><Clock size={10} /> {new Date(entry.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
               </div>
@@ -172,15 +177,17 @@ function DetailModal({ entry, onClose }: { entry: Entry; onClose: () => void }) 
 
         {/* 图片 */}
         {entry.image_url && (
-          <div className="rounded-2xl overflow-hidden mb-5 border border-white/5 shadow-lg relative aspect-video">
-            <img src={entry.image_url} className="w-full h-full object-cover opacity-90" />
+          <div className="rounded-2xl overflow-hidden mb-5 border border-white/10 shadow-lg relative aspect-video group cursor-pointer">
+            <img src={entry.image_url} className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" />
           </div>
         )}
 
         {/* 文字 */}
-        <p className="text-white/80 leading-relaxed font-medium text-base whitespace-pre-wrap">
-           {entry.content}
-        </p>
+        <div className="relative pl-3 border-l-2" style={{ borderColor: `${color}60` }}>
+           <p className="text-white/90 leading-relaxed font-medium text-base whitespace-pre-wrap">
+             {entry.content}
+           </p>
+        </div>
 
       </div>
     </div>
@@ -223,24 +230,24 @@ export default function EmotionGalaxy({ entries, filter }: { entries: Entry[], f
       {selectedEntry && <DetailModal entry={selectedEntry} onClose={() => setSelectedEntry(null)} />}
 
       <Canvas camera={{ position: [0, 0, 24], fov: 45 }} dpr={[1, 2]}>
-        <color attach="background" args={['#020205']} />
-        <fog attach="fog" args={['#020205', 20, 60]} />
+        <color attach="background" args={['#050508']} />
+        <fog attach="fog" args={['#050508', 20, 60]} />
 
         {/* @ts-ignore */}
         <EffectComposer disableNormalPass>
-          {/* 降低 Bloom 阈值，增强发光对比度 */}
-          <Bloom luminanceThreshold={0.2} mipmapBlur intensity={1.2} radius={0.6} />
+          {/* Bloom: 降低阈值，提高强度，让亮的地方更亮 */}
+          <Bloom luminanceThreshold={0.2} mipmapBlur intensity={1.5} radius={0.6} />
         </EffectComposer>
 
         <ambientLight intensity={0.1} />
         <pointLight position={[10, 10, 10]} intensity={1} color={universeColor} />
 
         <Stars radius={100} depth={50} count={6000} factor={4} saturation={0} fade speed={0.5} />
-        <Sparkles count={150} scale={15} size={3} speed={0.2} opacity={0.3} color={universeColor} />
+        <Sparkles count={100} scale={12} size={2} speed={0.2} opacity={0.3} color={universeColor} />
 
         <Float speed={1} rotationIntensity={0.1} floatIntensity={0.2}>
           <group>
-             {/* 线条只在没选中时显示，且非常淡 */}
+             {/* 连线只在没选中时显示，避免干扰视线 */}
              {!selectedEntry && (
                 <Connections positions={positions} color={universeColor} />
              )}

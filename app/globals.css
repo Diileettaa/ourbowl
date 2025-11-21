@@ -4,11 +4,23 @@
 
 :root {
   --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
+  --background-start-rgb: 255, 255, 255;
   --background-end-rgb: 255, 255, 255;
 }
 
 body {
-  background-color: #F0F2F5; /* 浅灰蓝背景，比纯白更有质感 */
-  color: #2D3748;
+  /* 强制纯白背景，解决滑动时的灰色缝隙 */
+  background-color: #FFFFFF; 
+  color: #111827;
+  /* 防止 iOS/Mac 上的橡皮筋回弹效果露出底色 */
+  overscroll-behavior-y: none; 
+}
+
+/* 隐藏滚动条但允许滚动 (可选，为了美观) */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
