@@ -1,85 +1,137 @@
-import { createClient } from '@/utils/supabase/server'
-import { redirect } from 'next/navigation'
-import Link from 'next/link'
+'use client'
+
+import { useState, useEffect } from 'react'
+import { supabase } from '@/utils/supabase/client'
 import { startOfMonth, endOfMonth, eachDayOfInterval, format, isSameMonth, isSameDay, parseISO } from 'date-fns'
+import { Search, ChevronLeft, ChevronRight } from 'lucide-react'
 
-export default async function CalendarPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/')
+export default function CalendarPage() {
+  const [currentDate, setCurrentDate] = useState(new Date()) // 当前月份
+  const [entries, setEntries] = useState<any[]>([])
+  const [keyword, setKeyword] = useState('') // 搜索关键词
+  
+  // 1. 获取数据 (一次性获取所有，方便搜索)
+  useEffect(() => {
+    const fetchData = async () => {
+      const { data } = await supabase.from('entries').select('*')
+      setEntries(data || [])
+    }
+    fetchData()
+  }, [])
 
-  // 1. Get current month range
-  const today = new Date()
-  const monthStart = startOfMonth(today)
-  const monthEnd = endOfMonth(today)
+  // 2. 日历算法
+  const monthStart = startOfMonth(currentDate)
+  const monthEnd = endOfMonth(currentDate)
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd })
+  
+  // 补齐前面的空格 (让1号对齐星期几)
+  const startDayOfWeek = monthStart.getDay() // 0是周日
+  const emptyDays = Array(startDayOfWeek).fill(null)
 
-  // 2. Fetch entries for this month
-  const { data: entries } = await supabase
-    .from('entries')
-    .select('created_at, mood, content, image_url')
-    .gte('created_at', monthStart.toISOString())
-    .lte('created_at', monthEnd.toISOString())
+  // 3. 核心逻辑：判断某一天是否匹配搜索
+  const checkDateStatus = (day: Date) => {
+    // 找到这一天的所有日记
+    const daysEntries = entries.filter(e => isSameDay(parseISO(e.created_at), day))
+    
+    if (daysEntries.length === 0) return 'empty' // 没日记
 
-  // Helper to find entry for a day
-  const getEntryForDay = (day: Date) => {
-    return entries?.find(e => isSameDay(parseISO(e.created_at), day))
+    // 如果有搜索词
+    if (keyword.trim()) {
+      // 检查这一天的日记里，有没有包含关键词的
+      const hasKeyword = daysEntries.some(e => 
+        e.content?.toLowerCase().includes(keyword.toLowerCase()) ||
+        e.mood?.toLowerCase().includes(keyword.toLowerCase()) ||
+        e.meal_type?.toLowerCase().includes(keyword.toLowerCase())
+      )
+      if (hasKeyword) return 'match' // ✨ 命中！(亮灯)
+      return 'dim' // 有日记但没命中 (变暗)
+    }
+
+    return 'has-entry' // 正常有日记
   }
 
-  // Helper for mood color
-  const getMoodColor = (mood: string) => {
-    if (!mood) return 'bg-gray-100'
-    if (mood.includes('Joy')) return 'bg-orange-200'
-    if (mood.includes('Calm')) return 'bg-emerald-200'
-    if (mood.includes('Tired')) return 'bg-indigo-200'
-    return 'bg-gray-200'
+  // 切换月份
+  const changeMonth = (offset: number) => {
+    const newDate = new Date(currentDate)
+    newDate.setMonth(newDate.getMonth() + offset)
+    setCurrentDate(newDate)
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] p-6 flex flex-col items-center">
+    <div className="min-h-screen bg-[#FAFAFA] p-4 md:p-8 flex flex-col items-center">
       
-      <div className="max-w-4xl w-full">
-        <div className="mb-8">
-          <h1 className="text-3xl font-extrabold text-gray-800">{format(today, 'MMMM yyyy')}</h1>
-          <p className="text-gray-400 text-sm">Your emotional journey map</p>
+      <div className="max-w-md w-full space-y-6">
+        
+        {/* 🔍 搜索栏 (Google 风格悬浮条) */}
+        <div className="relative group">
+          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+            <Search size={18} className="text-gray-400 group-focus-within:text-blue-500 transition-colors"/>
+          </div>
+          <input 
+            type="text" 
+            placeholder="Search memories (e.g., Gym, Pizza, Happy)..." 
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+            className="w-full pl-11 pr-4 py-3 bg-white border border-gray-200 rounded-full shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all"
+          />
         </div>
 
-        <div className="bg-white rounded-[32px] shadow-clay p-8 border border-white">
-          {/* Calendar Grid */}
-          <div className="grid grid-cols-7 gap-4 mb-4">
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-              <div key={day} className="text-center text-xs font-bold text-gray-400 uppercase tracking-wider">
-                {day}
-              </div>
+        {/* 📅 日历卡片 (Google 风格：紧凑、干净) */}
+        <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-6">
+          
+          {/* 头部：月份切换 */}
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-lg font-bold text-gray-800 pl-2">
+              {format(currentDate, 'MMMM yyyy')}
+            </h2>
+            <div className="flex gap-1">
+              <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-gray-100 rounded-full text-gray-500"><ChevronLeft size={20}/></button>
+              <button onClick={() => changeMonth(1)} className="p-2 hover:bg-gray-100 rounded-full text-gray-500"><ChevronRight size={20}/></button>
+            </div>
+          </div>
+
+          {/* 星期头 */}
+          <div className="grid grid-cols-7 mb-2">
+            {['S','M','T','W','T','F','S'].map(d => (
+              <div key={d} className="text-center text-xs font-medium text-gray-400 py-2">{d}</div>
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-4">
-            {days.map((day, i) => {
-              const entry = getEntryForDay(day)
+          {/* 日期格子 */}
+          <div className="grid grid-cols-7 gap-y-2 gap-x-1">
+            {/* 空白占位 */}
+            {emptyDays.map((_, i) => <div key={`empty-${i}`} />)}
+
+            {/* 真实日期 */}
+            {days.map((day) => {
+              const status = checkDateStatus(day)
+              const isToday = isSameDay(day, new Date())
+              
               return (
-                <div 
-                  key={day.toString()} 
-                  className={`aspect-square rounded-2xl border border-transparent transition-all hover:scale-110 hover:shadow-md cursor-pointer relative overflow-hidden group ${
-                    entry ? getMoodColor(entry.mood) : 'bg-gray-50 hover:bg-gray-100'
-                  }`}
-                >
-                  <span className={`absolute top-2 left-2 text-sm font-bold ${!isSameMonth(day, today) ? 'text-gray-200' : 'text-gray-500'}`}>
+                <div key={day.toString()} className="flex flex-col items-center justify-center aspect-square relative">
+                  <div className={`
+                    w-8 h-8 flex items-center justify-center rounded-full text-sm font-medium transition-all duration-300
+                    ${isToday && status === 'empty' ? 'bg-blue-600 text-white' : ''} 
+                    ${status === 'empty' && !isToday ? 'text-gray-700 hover:bg-gray-100' : ''}
+                    
+                    ${status === 'has-entry' ? 'bg-gray-100 text-gray-900 font-bold' : ''} 
+                    
+                    /* ✨ 命中高亮状态：橙色呼吸灯 */
+                    ${status === 'match' ? 'bg-orange-400 text-white shadow-md scale-110 ring-2 ring-orange-100' : ''}
+                    
+                    /* 没命中变暗状态 */
+                    ${status === 'dim' ? 'text-gray-300' : ''}
+                  `}>
                     {format(day, 'd')}
-                  </span>
-
-                  {/* If has image, show image as background */}
-                  {entry?.image_url && (
-                    <img src={entry.image_url} className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                  
+                  {/* 命中的小红点标记 */}
+                  {status === 'match' && (
+                    <div className="w-1 h-1 bg-orange-400 rounded-full mt-1"></div>
                   )}
-
-                  {/* Mood Emoji */}
-                  {entry && !entry.image_url && (
-                    <div className="absolute inset-0 flex items-center justify-center text-2xl">
-                       {/* Simple mapping, can be improved */}
-                       {entry.mood.includes('Joy') ? '🥰' : 
-                        entry.mood.includes('Calm') ? '🌿' : '📝'}
-                    </div>
+                  {/* 普通有日记的标记 */}
+                  {status === 'has-entry' && !keyword && (
+                    <div className="w-1 h-1 bg-gray-300 rounded-full mt-1"></div>
                   )}
                 </div>
               )
@@ -87,20 +139,36 @@ export default async function CalendarPage() {
           </div>
         </div>
 
-        {/* Simple Stats (Placeholder for now) */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
-          <div className="bg-white p-6 rounded-3xl shadow-sm">
-            <div className="text-2xl font-bold text-gray-800">{entries?.length || 0}</div>
-            <div className="text-xs text-gray-400 uppercase">Entries this month</div>
+        {/* 👇 搜索结果列表 (只有搜索时显示) */}
+        {keyword && (
+          <div className="animate-in slide-in-from-bottom-4 fade-in">
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 ml-1">
+              Found Records
+            </h3>
+            <div className="space-y-2">
+              {entries.filter(e => e.content?.toLowerCase().includes(keyword.toLowerCase())).map(entry => (
+                <div key={entry.id} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex gap-3 items-center">
+                   <div className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-lg shrink-0">
+                     {/* 简单的日期数字 */}
+                     <span className="text-xs font-bold text-orange-600">
+                       {new Date(entry.created_at).getDate()}
+                     </span>
+                   </div>
+                   <div className="min-w-0">
+                     <p className="text-sm text-gray-800 font-medium truncate">{entry.content}</p>
+                     <p className="text-xs text-gray-400">
+                       {new Date(entry.created_at).toLocaleDateString()} • {entry.mood}
+                     </p>
+                   </div>
+                </div>
+              ))}
+              {entries.filter(e => e.content?.toLowerCase().includes(keyword.toLowerCase())).length === 0 && (
+                <div className="text-center text-gray-400 text-sm py-4">No matches found for "{keyword}"</div>
+              )}
+            </div>
           </div>
-          <div className="bg-white p-6 rounded-3xl shadow-sm">
-             <div className="text-2xl font-bold text-orange-400">
-               {entries?.filter(e => e.mood?.includes('Joy')).length || 0}
-             </div>
-             <div className="text-xs text-gray-400 uppercase">Joyful Days</div>
-          </div>
-          {/* Add more stats here */}
-        </div>
+        )}
+
       </div>
     </div>
   )

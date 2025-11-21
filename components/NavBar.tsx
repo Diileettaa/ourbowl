@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
-import { Home, Calendar, Globe, Users, ChevronDown, Check } from 'lucide-react'
+import { Home, Calendar, Globe, Users, ChevronDown, Check, Plus, Map } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 export default function NavBar({ userEmail }: { userEmail?: string }) {
@@ -14,6 +14,7 @@ export default function NavBar({ userEmail }: { userEmail?: string }) {
   const navItems = [
     { name: 'Home', href: '/dashboard', icon: Home },
     { name: 'Calendar', href: '/calendar', icon: Calendar },
+    { name: 'Journey', href: '/journey', icon: Map },
     { name: 'Galaxy', href: '/exploration', icon: Globe },
     { name: 'Park', href: '/park', icon: Users },
   ]
@@ -129,9 +130,4 @@ export default function NavBar({ userEmail }: { userEmail?: string }) {
       </div>
     </nav>
   )
-}
-
-// Helper icon for add
-function Plus({size}: {size:number}) {
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
 }
