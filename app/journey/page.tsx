@@ -4,10 +4,10 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, X, Maximize2, Edit2, Trash2 } from 'lucide-react' // 引入图标
+import { ArrowLeft, X, Maximize2, Edit2, Trash2 } from 'lucide-react'
 
 const moodEmojiMap: Record<string, string> = {
-  'Joy': '🥰', 'Calm': '🌿', 'Neutral': '😶', 'Tired': '😴', 'Stressed': '🤯',
+  'Joy': '🥰', 'Calm': '🙂', 'Neutral': '😶', 'Tired': '😴', 'Stressed': '🤯',
   'Angry': '🤬', 'Crying': '😭', 'Excited': '🎉', 'Sick': '🤢', 'Proud': '😎', 'Love': '❤️'
 }
 
@@ -16,30 +16,34 @@ export default function JourneyPage() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const router = useRouter()
 
-  // 提取成函数，方便刷新
   const fetchData = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/'); return }
-      const { data } = await supabase.from('entries').select('*').order('created_at', { ascending: false })
+      
+      // ✨✨✨ 核心修复在这里 ✨✨✨
+      const { data } = await supabase
+        .from('entries')
+        .select('*')
+        .eq('user_id', user.id) // <--- 只查我的！
+        .order('created_at', { ascending: false })
+        
       setEntries(data || [])
   }
 
   useEffect(() => { fetchData() }, [])
 
-  // ✨ 新增：删除功能
   const handleDelete = async (id: string) => {
     if (confirm('Delete this memory?')) {
       await supabase.from('entries').delete().eq('id', id)
-      fetchData() // 刷新列表
+      fetchData()
     }
   }
 
-  // ✨ 新增：编辑功能
   const handleEdit = async (entry: any) => {
     const newContent = prompt('Edit content:', entry.content)
     if (newContent && newContent !== entry.content) {
       await supabase.from('entries').update({ content: newContent }).eq('id', entry.id)
-      fetchData() // 刷新列表
+      fetchData()
     }
   }
 
@@ -66,7 +70,6 @@ export default function JourneyPage() {
         </div>
 
         <div className="relative border-l border-gray-200 ml-3 space-y-4 pb-20">
-          
           {entries.map((entry) => {
             const lines = entry.content?.split('\n') || []
             const title = lines[0]?.length < 20 ? lines[0] : null
@@ -79,7 +82,6 @@ export default function JourneyPage() {
 
                 <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-[0_1px_2px_rgba(0,0,0,0.02)] hover:shadow-md transition-all flex gap-3 relative group/card">
                   
-                  {/* ✨ 悬浮操作按钮 (仅在鼠标悬停时显示) */}
                   <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity z-20 bg-white/80 backdrop-blur rounded-lg p-1">
                      <button onClick={() => handleEdit(entry)} className="p-1 text-yellow-600 hover:bg-yellow-50 rounded"><Edit2 size={12}/></button>
                      <button onClick={() => handleDelete(entry.id)} className="p-1 text-red-600 hover:bg-red-50 rounded"><Trash2 size={12}/></button>

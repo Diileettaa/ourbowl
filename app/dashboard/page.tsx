@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import MagicBar from '@/components/MagicBar'
 import PetMochi from '@/components/PetMochi'
-import { X, ArrowRight, Edit2, Trash2 } from 'lucide-react' // 引入新图标
+import { X, ArrowRight, Edit2, Trash2 } from 'lucide-react'
 
 const moodEmojiMap: Record<string, string> = {
   'Joy': '🥰', 'Calm': '🙂', 'Neutral': '😶', 'Tired': '😴', 'Stressed': '🤯',
@@ -24,9 +24,18 @@ export default function Dashboard() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/'); return }
       setUser(user)
+      
       const { data: petData } = await supabase.from('pet_states').select('*').eq('user_id', user.id).single()
       setPet(petData)
-      const { data: entryData } = await supabase.from('entries').select('*').order('created_at', { ascending: false }).limit(5)
+      
+      // ✨✨✨ 核心修复在这里 ✨✨✨
+      const { data: entryData } = await supabase
+        .from('entries')
+        .select('*')
+        .eq('user_id', user.id) // <--- 加上这一句：只查 ID 等于我的日记
+        .order('created_at', { ascending: false })
+        .limit(5)
+      
       setEntries(entryData || [])
   }
 
@@ -36,26 +45,24 @@ export default function Dashboard() {
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this memory?')) {
       await supabase.from('entries').delete().eq('id', id)
-      fetchData() // 刷新列表
+      fetchData() 
     }
   }
 
-  // --- 编辑功能 (MVP版：用 prompt 弹窗修改文字) ---
+  // --- 编辑功能 ---
   const handleEdit = async (entry: any) => {
     const newContent = prompt('Edit your memory:', entry.content)
     if (newContent && newContent !== entry.content) {
       await supabase.from('entries').update({ content: newContent }).eq('id', entry.id)
-      fetchData() // 刷新列表
+      fetchData() 
     }
   }
 
   if (!user) return null
 
   return (
-    // 1. 纯白背景，去除所有色块
     <div className="min-h-screen bg-white pb-20 relative">
       
-      {/* Lightbox */}
       {selectedImage && (
         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setSelectedImage(null)}>
           <button className="absolute top-6 right-6 text-white/70 hover:text-white"><X size={32}/></button>
@@ -63,7 +70,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* 2. 紧凑头部 (pt-20) */}
       <div className="max-w-2xl mx-auto px-4 pt-20 relative z-10">
         
         <div className="flex justify-between items-center mb-4">
@@ -76,19 +82,16 @@ export default function Dashboard() {
           </Link>
         </div>
 
-        {/* 宠物区 */}
         <div className="flex justify-center mb-4 -mt-2 relative z-0">
            <div className="w-full h-48 flex items-end justify-center">
               {pet ? <PetMochi lastFedAt={pet.last_fed_at} /> : <div className="text-4xl animate-bounce">🥚</div>}
            </div>
         </div>
 
-        {/* 输入框 */}
         <div className="mb-8 sticky top-4 z-40 -mt-8">
            <MagicBar />
         </div>
 
-        {/* 列表 */}
         <div className="space-y-4">
           <div className="flex items-center justify-between mb-2 px-2">
              <span className="text-xs font-bold text-gray-900 uppercase tracking-wider">Recent</span>
@@ -106,20 +109,9 @@ export default function Dashboard() {
              return (
               <div key={entry.id} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all flex justify-between gap-4 group relative">
                 
-                {/* 🔴 🟡 编辑/删除按钮 (悬浮显示) */}
                 <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                   <button 
-                     onClick={() => handleEdit(entry)}
-                     className="p-1.5 bg-yellow-100 text-yellow-600 rounded-lg hover:bg-yellow-200" title="Edit"
-                   >
-                     <Edit2 size={12} />
-                   </button>
-                   <button 
-                     onClick={() => handleDelete(entry.id)}
-                     className="p-1.5 bg-red-100 text-red-600 rounded-lg hover:bg-red-200" title="Delete"
-                   >
-                     <Trash2 size={12} />
-                   </button>
+                   <button onClick={() => handleEdit(entry)} className="p-1.5 bg-yellow-100 text-yellow-600 rounded-lg hover:bg-yellow-200"><Edit2 size={12} /></button>
+                   <button onClick={() => handleDelete(entry.id)} className="p-1.5 bg-red-100 text-red-600 rounded-lg hover:bg-red-200"><Trash2 size={12} /></button>
                 </div>
 
                 <div className="flex-1 flex flex-col min-w-0">
@@ -130,7 +122,6 @@ export default function Dashboard() {
                         {entry.meal_type || 'Note'}
                       </span>
                       <div className="text-lg">{moodEmoji}</div>
-                      {/* 显示是否公开 */}
                       {entry.is_public && <span className="text-[10px] text-green-500 font-bold border border-green-200 px-1 rounded">Public</span>}
                    </div>
 
