@@ -24,7 +24,7 @@ export default async function ParkPage() {
     <div className="min-h-screen bg-white pb-20">
       
       {/* 顶部导航栏 (纯白) */}
-      <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100">
+      <div className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-gray-100">
          <div className="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link href="/dashboard" className="p-2 bg-gray-50 rounded-full hover:bg-gray-100 transition-colors">

@@ -27,7 +27,7 @@ export default function NavBar({ userEmail }: { userEmail?: string }) {
 
   return (
     // ✨ 修复：彻底移除了背景色和模糊，现在它是完全隐形的容器
-    <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4 pointer-events-none flex justify-center">
+    <nav className="fixed top-0 left-0 right-0 z-[100] px-6 py-4 pointer-events-none flex justify-center">
 
       <div className="w-full max-w-5xl flex justify-between items-center pointer-events-auto">
         
