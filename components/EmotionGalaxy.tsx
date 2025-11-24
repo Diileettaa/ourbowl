@@ -40,7 +40,14 @@ function Connections({ positions, color }: { positions: THREE.Vector3[], color: 
   }, [positions])
 
   return (
-    <Line points={lines} color={color} opacity={0.05} transparent lineWidth={0.5} segments />
+     <Line
+      points={lines}
+      color={color}
+      opacity={0.02} // ✨ 极度透明 (从 0.1 改为 0.02)，几乎看不见，只有动的时候能感觉到
+      transparent
+      lineWidth={0.3} // ✨ 极细 (从 1 改为 0.3)，像蚕丝一样
+      segments
+    />
   )
 }
 
