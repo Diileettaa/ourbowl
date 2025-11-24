@@ -4,12 +4,14 @@ import { useState, useRef } from 'react'
 import { supabase } from '@/utils/supabase/client'
 import { Send, Camera, Image as ImageIcon, X, ChevronUp, Utensils, Sparkles, PenLine, AlignLeft, Globe, Lock, Plus } from 'lucide-react'
 import CameraModal from './CameraModal'
+import { useProfile } from '@/context/ProfileContext'
 
 export default function MagicBar() {
   const [isExpanded, setIsExpanded] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [recordMode, setRecordMode] = useState<'food' | 'life'>('food')
-  
+  const { currentProfile } = useProfile()
+
   const [content, setContent] = useState('')
   const [foodContent, setFoodContent] = useState('')
   const [mood, setMood] = useState('')
@@ -89,7 +91,8 @@ export default function MagicBar() {
         image_url: imageUrl, 
         user_id: user.id,
         is_public: isPublic, // ✨ 提交时带上 is_public
-        meal_type: recordMode === 'food' ? mealType : 'Life'
+        meal_type: recordMode === 'food' ? mealType : 'Life',
+        profile_id: currentProfile?.id
       })
 
       await supabase.from('pet_states').update({ last_fed_at: new Date().toISOString() }).eq('user_id', user.id)

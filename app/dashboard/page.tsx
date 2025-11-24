@@ -6,6 +6,7 @@ import Link from 'next/link'
 import MagicBar from '@/components/MagicBar'
 import PetMochi from '@/components/PetMochi'
 import { X, ArrowRight, Edit2, Trash2 } from 'lucide-react'
+import { useProfile } from '@/context/ProfileContext'
 
 const moodEmojiMap: Record<string, string> = {
   'Joy': '🥰', 'Calm': '🙂', 'Neutral': '😶', 'Tired': '😴', 'Stressed': '🤯',
@@ -18,6 +19,7 @@ export default function Dashboard() {
   const [entries, setEntries] = useState<any[]>([])
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const router = useRouter()
+  const { currentProfile } = useProfile()
 
   // 获取数据
   const fetchData = async () => {
