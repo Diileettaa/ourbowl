@@ -38,7 +38,7 @@ export default function ExplorationPage() {
     const getData = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/'); return }
-      const { data } = await supabase.from('entries').select('*').order('created_at', { ascending: false })
+      const { data } = await supabase.from('entries').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
       setEntries(data || [])
       setLoading(false)
     }

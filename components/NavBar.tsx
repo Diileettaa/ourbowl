@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 
 export default function NavBar({ userEmail }: { userEmail?: string }) {
   const pathname = usePathname()
+  if (pathname === '/') return null
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [currentProfile, setCurrentProfile] = useState('human') 
 
