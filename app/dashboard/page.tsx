@@ -7,7 +7,7 @@ import Link from 'next/link'
 import MagicBar from '@/components/MagicBar'
 import PetMochi from '@/components/PetMochi'
 import { X, ArrowRight, Edit2, Trash2 } from 'lucide-react'
-import { useProfile } from '@/context/ProfileContext' // <--- 1. 引入这个工具
+import { useProfile } from '@/context/ProfileContext'
 
 const moodEmojiMap: Record<string, string> = {
   'Joy': '🥰', 'Calm': '🌿', 'Neutral': '😶', 'Tired': '😴', 'Stressed': '🤯',
@@ -20,27 +20,22 @@ export default function Dashboard() {
   const [entries, setEntries] = useState<any[]>([])
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const router = useRouter()
-  
-  // 2. 获取当前选中的档案
-  const { currentProfile } = useProfile() 
+  const { currentProfile } = useProfile()
 
-  // 获取数据函数
   const fetchData = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/'); return }
       setUser(user)
       
-      // 获取宠物状态 (宠物是共享的，所以不用按档案筛选)
       const { data: petData } = await supabase.from('pet_states').select('*').eq('user_id', user.id).single()
       setPet(petData)
       
-      // 3. 获取日记 (关键修改！！！)
       if (currentProfile) {
         const { data: entryData } = await supabase
           .from('entries')
           .select('*')
           .eq('user_id', user.id)
-          .eq('profile_id', currentProfile.id) // <--- 只看当前档案的日记！
+          .eq('profile_id', currentProfile.id)
           .order('created_at', { ascending: false })
           .limit(5)
         
@@ -48,21 +43,15 @@ export default function Dashboard() {
       }
   }
 
-  // 4. 监听 currentProfile 的变化
-  // 只要你一切换头像，这个 useEffect 就会重新跑一遍 fetchData
-  useEffect(() => { 
-    fetchData() 
-  }, [currentProfile]) 
+  useEffect(() => { fetchData() }, [currentProfile])
 
-  // --- 删除功能 ---
   const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this memory?')) {
+    if (confirm('Delete this memory?')) {
       await supabase.from('entries').delete().eq('id', id)
       fetchData() 
     }
   }
 
-  // --- 编辑功能 ---
   const handleEdit = async (entry: any) => {
     const newContent = prompt('Edit your memory:', entry.content)
     if (newContent && newContent !== entry.content) {
@@ -74,7 +63,8 @@ export default function Dashboard() {
   if (!user) return null
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#FFFBEB] to-[#F1F5F9] pb-20 relative">
+    // ✨ 背景：纯白
+    <div className="min-h-screen bg-white pb-20 relative">
       
       {selectedImage && (
         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setSelectedImage(null)}>
@@ -83,48 +73,33 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="max-w-2xl mx-auto px-4 pt-28 relative z-10">
+      <div className="max-w-2xl mx-auto px-4 pt-20 relative z-10">
         
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-4">
           <div>
-            <h1 className="text-3xl font-black text-gray-800 tracking-tight">
-              {/* 显示当前档案的名字 */}
-              Hello, {currentProfile?.name || 'Owner'}
+            <h1 className="text-2xl font-black text-gray-900 tracking-tight">
+               Hello, {currentProfile?.name || 'Owner'}
             </h1>
-            <p className="text-sm text-gray-400 font-medium mt-1 font-mono">{user.email}</p>
+            <p className="text-xs text-gray-400 font-medium mt-0.5 font-mono">{user.email}</p>
           </div>
-          <Link href="/exploration" className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-all border-2 border-[#FFFBEB]">
+          <Link href="/exploration" className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-all">
             🪐
           </Link>
         </div>
 
-        <div className="bg-white/60 backdrop-blur-md p-6 rounded-[32px] shadow-sm border border-white/60 mb-10 relative overflow-visible">
-           <div className="flex justify-between items-center">
-              <div>
-                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Pet Status</div>
-                 <h2 className="text-xl font-bold text-gray-800 mb-1">Mochi is Active</h2>
-                 <p className="text-sm text-gray-400">Level 1 • Baby Phase</p>
-                 <div className="flex gap-2 mt-4">
-                    <span className="px-3 py-1 bg-orange-100/50 text-orange-500 text-xs font-bold rounded-full">LV.1 Baby</span>
-                    <span className="px-3 py-1 bg-blue-100/50 text-blue-500 text-xs font-bold rounded-full">✨ Happy</span>
-                 </div>
-              </div>
-              <div className="w-32 h-24 relative -mr-4 -mt-6">
-                 {pet ? <PetMochi lastFedAt={pet.last_fed_at} /> : <div className="text-2xl">🥚</div>}
-              </div>
+        <div className="flex justify-center mb-4 -mt-2 relative z-0">
+           <div className="w-full h-48 flex items-end justify-center">
+              {pet ? <PetMochi lastFedAt={pet.last_fed_at} /> : <div className="text-4xl animate-bounce">🥚</div>}
            </div>
         </div>
 
-        <div className="mb-12">
+        <div className="mb-8 sticky top-4 z-40 -mt-8">
            <MagicBar />
         </div>
 
         <div className="space-y-4">
           <div className="flex items-center justify-between mb-2 px-2">
-             <span className="text-xs font-bold text-gray-900 uppercase tracking-wider">
-               {/* 动态标题：显示是谁的日记 */}
-               {currentProfile?.name}'s Recent
-             </span>
+             <span className="text-xs font-bold text-gray-900 uppercase tracking-wider">Recent</span>
              <Link href="/journey" className="text-[10px] font-bold text-gray-400 hover:text-gray-900 flex items-center gap-1 transition-colors">
                View All <ArrowRight size={12}/>
              </Link>
@@ -139,7 +114,7 @@ export default function Dashboard() {
              return (
               <div key={entry.id} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all flex justify-between gap-4 group relative">
                 
-                <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                    <button onClick={() => handleEdit(entry)} className="p-1.5 bg-yellow-100 text-yellow-600 rounded-lg hover:bg-yellow-200"><Edit2 size={12} /></button>
                    <button onClick={() => handleDelete(entry.id)} className="p-1.5 bg-red-100 text-red-600 rounded-lg hover:bg-red-200"><Trash2 size={12} /></button>
                 </div>
@@ -177,11 +152,9 @@ export default function Dashboard() {
               </div>
              )
           })}
-
+          
           {entries.length === 0 && (
-            <div className="text-center py-12 text-gray-300 text-sm">
-              No memories for {currentProfile?.name} yet. Start recording!
-            </div>
+             <div className="text-center py-10 text-gray-300 text-sm">No records yet.</div>
           )}
         </div>
 
