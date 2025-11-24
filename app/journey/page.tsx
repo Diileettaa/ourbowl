@@ -5,6 +5,7 @@ import { supabase } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, X, Maximize2, Edit2, Trash2 } from 'lucide-react'
+import { useProfile } from '@/context/ProfileContext' // <--- 1. 引入
 
 const moodEmojiMap: Record<string, string> = {
   'Joy': '🥰', 'Calm': '🙂', 'Neutral': '😶', 'Tired': '😴', 'Stressed': '🤯',
@@ -15,22 +16,29 @@ export default function JourneyPage() {
   const [entries, setEntries] = useState<any[]>([])
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const router = useRouter()
+  
+  // 2. 获取当前档案
+  const { currentProfile } = useProfile()
 
   const fetchData = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/'); return }
       
-      // ✨✨✨ 核心修复在这里 ✨✨✨
-      const { data } = await supabase
-        .from('entries')
-        .select('*')
-        .eq('user_id', user.id) // <--- 只查我的！
-        .order('created_at', { ascending: false })
-        
-      setEntries(data || [])
+      // 3. 关键修改：只查当前档案的数据
+      if (currentProfile) {
+        const { data } = await supabase
+          .from('entries')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('profile_id', currentProfile.id) // <--- 过滤条件
+          .order('created_at', { ascending: false })
+          
+        setEntries(data || [])
+      }
   }
 
-  useEffect(() => { fetchData() }, [])
+  // 4. 监听切换：只要 currentProfile 变了，就重新 fetchData
+  useEffect(() => { fetchData() }, [currentProfile])
 
   const handleDelete = async (id: string) => {
     if (confirm('Delete this memory?')) {
@@ -64,7 +72,10 @@ export default function JourneyPage() {
             <ArrowLeft size={18} className="text-gray-600" />
           </Link>
           <div>
-            <h1 className="text-xl font-extrabold text-gray-900 tracking-tight">Journey</h1>
+            <h1 className="text-xl font-extrabold text-gray-900 tracking-tight">
+              {/* 动态标题 */}
+              {currentProfile?.name}'s Journey
+            </h1>
             <p className="text-[10px] text-gray-400 font-mono uppercase tracking-wider">{entries.length} memories</p>
           </div>
         </div>
@@ -116,6 +127,10 @@ export default function JourneyPage() {
               </div>
             )
           })}
+
+          {entries.length === 0 && (
+             <div className="pl-6 text-gray-300 text-xs italic">No journey recorded for {currentProfile?.name} yet...</div>
+          )}
         </div>
       </div>
     </div>
